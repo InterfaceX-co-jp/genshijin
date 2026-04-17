@@ -7,6 +7,15 @@ on:
       - 'skills/**'
       - 'benchmarks/**'
   workflow_dispatch:
+    inputs:
+      lang:
+        description: 'Language to benchmark'
+        type: choice
+        options:
+          - ja
+          - en
+          - both
+        default: ja
 
 permissions:
   contents: write
@@ -18,7 +27,7 @@ jobs:
     strategy:
       max-parallel: 1
       matrix:
-        lang: [ja, en]
+        lang: ${{ fromJSON(github.event_name == 'push' && '["ja"]' || inputs.lang == 'both' && '["ja","en"]' || format('["{0}"]', inputs.lang)) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
