@@ -7,6 +7,9 @@ genshijin ベンチマーク
   pip install -r requirements.txt
   export ANTHROPIC_API_KEY=sk-ant-...
   python run.py [--trials 3] [--model claude-sonnet-4-20250514] [--update-readme]
+
+  # extended thinking実験（思考モデル必須: sonnet-4-5以降 or opus-4-x）
+  python run.py --model claude-sonnet-4-5-20250929 --thinking 2000 --trials 2
 """
 
 import argparse
@@ -58,12 +61,50 @@ def api_call_with_retry(client, **kwargs):
     return client.messages.create(**kwargs)
 
 
+def extract_blocks(response) -> tuple[str, str]:
+    """レスポンスから thinking部分 と 最終text部分 を分離抽出。"""
+    thinking_parts = []
+    text_parts = []
+    for block in response.content:
+        if block.type == "thinking":
+            thinking_parts.append(block.thinking)
+        elif block.type == "text":
+            text_parts.append(block.text)
+    return "\n".join(thinking_parts), "\n".join(text_parts)
+
+
+def split_tokens(total_tokens: int, thinking_text: str, answer_text: str) -> tuple[int, int]:
+    """output_tokens を 文字数比で thinking / text に按分。
+    Claudeは正確な個別トークン数を返さないため、char比率で近似。"""
+    t_chars = len(thinking_text)
+    a_chars = len(answer_text)
+    total_chars = t_chars + a_chars
+    if total_chars == 0:
+        return 0, total_tokens
+    thinking_tokens = round(total_tokens * t_chars / total_chars)
+    text_tokens = total_tokens - thinking_tokens
+    return thinking_tokens, text_tokens
+
+
+def call_mode(client, model, system, prompt, max_tokens, thinking_budget):
+    kwargs = {
+        "model": model,
+        "max_tokens": max_tokens,
+        "system": system,
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    if thinking_budget:
+        kwargs["thinking"] = {"type": "enabled", "budget_tokens": thinking_budget}
+    return api_call_with_retry(client, **kwargs)
+
+
 def run_benchmark(
     client: Anthropic,
     model: str,
     prompts: list[dict],
     trials: int,
     lang: str = "ja",
+    thinking_budget: int = 0,
 ) -> list[dict]:
     genshijin_text = load_skill(SKILL_FILE)
     caveman_text = load_skill(CAVEMAN_SKILL_FILE)
@@ -73,6 +114,9 @@ def run_benchmark(
     else:
         normal_system = NORMAL_SYSTEM_EN
     results = []
+
+    # thinking有効時はmax_tokens >= budget+出力余裕 必要
+    max_tokens = max(4096, thinking_budget + 4096) if thinking_budget else 4096
 
     for prompt_data in prompts:
         prompt_id = prompt_data["id"]
@@ -85,6 +129,12 @@ def run_benchmark(
         normal_texts = []
         caveman_texts = []
         genshijin_texts = []
+        normal_thinking = []
+        caveman_thinking = []
+        genshijin_thinking = []
+        normal_split = []  # [(thinking_tokens, text_tokens), ...]
+        caveman_split = []
+        genshijin_split = []
 
         for trial in range(trials):
             print(
@@ -94,44 +144,35 @@ def run_benchmark(
             )
 
             # 通常応答
-            resp_normal = api_call_with_retry(
-                client,
-                model=model,
-                max_tokens=4096,
-                system=normal_system,
-                messages=[{"role": "user", "content": prompt}],
-            )
+            resp_normal = call_mode(client, model, normal_system, prompt, max_tokens, thinking_budget)
             n_tokens = resp_normal.usage.output_tokens
+            n_think, n_text = extract_blocks(resp_normal)
             normal_tokens.append(n_tokens)
-            normal_texts.append(resp_normal.content[0].text)
+            normal_texts.append(n_text)
+            normal_thinking.append(n_think)
+            normal_split.append(split_tokens(n_tokens, n_think, n_text))
 
             time.sleep(API_CALL_INTERVAL)
 
             # caveman応答
-            resp_caveman = api_call_with_retry(
-                client,
-                model=model,
-                max_tokens=4096,
-                system=caveman_text,
-                messages=[{"role": "user", "content": prompt}],
-            )
+            resp_caveman = call_mode(client, model, caveman_text, prompt, max_tokens, thinking_budget)
             cv_tokens = resp_caveman.usage.output_tokens
+            cv_think, cv_text = extract_blocks(resp_caveman)
             caveman_tokens.append(cv_tokens)
-            caveman_texts.append(resp_caveman.content[0].text)
+            caveman_texts.append(cv_text)
+            caveman_thinking.append(cv_think)
+            caveman_split.append(split_tokens(cv_tokens, cv_think, cv_text))
 
             time.sleep(API_CALL_INTERVAL)
 
             # genshijin応答
-            resp_genshijin = api_call_with_retry(
-                client,
-                model=model,
-                max_tokens=4096,
-                system=genshijin_text,
-                messages=[{"role": "user", "content": prompt}],
-            )
+            resp_genshijin = call_mode(client, model, genshijin_text, prompt, max_tokens, thinking_budget)
             g_tokens = resp_genshijin.usage.output_tokens
+            g_think, g_text = extract_blocks(resp_genshijin)
             genshijin_tokens.append(g_tokens)
-            genshijin_texts.append(resp_genshijin.content[0].text)
+            genshijin_texts.append(g_text)
+            genshijin_thinking.append(g_think)
+            genshijin_split.append(split_tokens(g_tokens, g_think, g_text))
 
             print(f"通常={n_tokens} caveman={cv_tokens} genshijin={g_tokens}")
 
@@ -142,6 +183,10 @@ def run_benchmark(
         saved_genshijin_pct = round((1 - median_genshijin / median_normal) * 100)
         # genshijin vs caveman の改善率
         vs_caveman_pct = round((1 - median_genshijin / median_caveman) * 100) if median_caveman > 0 else 0
+
+        # thinking/text 個別の中央値
+        def med_split(splits, idx):
+            return int(statistics.median([s[idx] for s in splits])) if splits else 0
 
         results.append(
             {
@@ -154,14 +199,95 @@ def run_benchmark(
                 "normal_texts": normal_texts,
                 "caveman_texts": caveman_texts,
                 "genshijin_texts": genshijin_texts,
+                "normal_thinking": normal_thinking,
+                "caveman_thinking": caveman_thinking,
+                "genshijin_thinking": genshijin_thinking,
+                "normal_split": normal_split,
+                "caveman_split": caveman_split,
+                "genshijin_split": genshijin_split,
                 "median_normal": median_normal,
                 "median_caveman": median_caveman,
                 "median_genshijin": median_genshijin,
+                "median_normal_think": med_split(normal_split, 0),
+                "median_normal_text": med_split(normal_split, 1),
+                "median_caveman_think": med_split(caveman_split, 0),
+                "median_caveman_text": med_split(caveman_split, 1),
+                "median_genshijin_think": med_split(genshijin_split, 0),
+                "median_genshijin_text": med_split(genshijin_split, 1),
                 "saved_caveman_pct": saved_caveman_pct,
                 "saved_genshijin_pct": saved_genshijin_pct,
                 "vs_caveman_pct": vs_caveman_pct,
             }
         )
+
+    return results
+
+
+JUDGE_SYSTEM = """あなたは技術的回答の品質を厳格に評価する審判です。
+3つの回答（A/B/C）を、元の質問に対する「技術的正確性」「完全性」で0-10点評価してください。
+スタイル（丁寧さ/簡潔さ）は評価対象外。情報量・正確性のみ評価。
+必ず以下のJSON形式のみで出力。他の文章は一切出力しない:
+{"A":{"accuracy":N,"completeness":N,"reason":"..."},"B":{...},"C":{...}}"""
+
+
+def judge_answers(client, judge_model: str, prompt: str, answers: dict) -> dict:
+    """3モード回答をLLM-as-judgeで採点。answers={'A':text,'B':text,'C':text}"""
+    user_msg = (
+        f"【質問】\n{prompt}\n\n"
+        f"【回答A】\n{answers['A']}\n\n"
+        f"【回答B】\n{answers['B']}\n\n"
+        f"【回答C】\n{answers['C']}"
+    )
+    resp = api_call_with_retry(
+        client,
+        model=judge_model,
+        max_tokens=1024,
+        system=JUDGE_SYSTEM,
+        messages=[{"role": "user", "content": user_msg}],
+    )
+    text = "".join(b.text for b in resp.content if b.type == "text").strip()
+    # JSONブロックのみ抽出
+    start = text.find("{")
+    end = text.rfind("}")
+    if start >= 0 and end > start:
+        text = text[start : end + 1]
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return {"error": "parse_failed", "raw": text}
+
+
+def run_judge(client, judge_model: str, results: list[dict]) -> list[dict]:
+    """各プロンプトのtrial1回答を採点（盲検化のため順序ランダマイズ）。"""
+    import random
+
+    for r in results:
+        # trial 0 のみ採点（コスト抑制）
+        mapping = [("normal", r["normal_texts"][0]),
+                   ("caveman", r["caveman_texts"][0]),
+                   ("genshijin", r["genshijin_texts"][0])]
+        random.shuffle(mapping)
+        labels = ["A", "B", "C"]
+        answers = {labels[i]: mapping[i][1] for i in range(3)}
+        label_to_mode = {labels[i]: mapping[i][0] for i in range(3)}
+
+        print(f"  judge: {r['id']}...", end=" ", flush=True)
+        verdict = judge_answers(client, judge_model, r["prompt"], answers)
+        # ラベル→モード名に復号
+        scored = {}
+        if "error" not in verdict:
+            for label, mode in label_to_mode.items():
+                scored[mode] = verdict.get(label, {})
+            print(
+                f"normal={scored.get('normal',{}).get('accuracy','?')}/{scored.get('normal',{}).get('completeness','?')} "
+                f"caveman={scored.get('caveman',{}).get('accuracy','?')}/{scored.get('caveman',{}).get('completeness','?')} "
+                f"genshijin={scored.get('genshijin',{}).get('accuracy','?')}/{scored.get('genshijin',{}).get('completeness','?')}"
+            )
+        else:
+            scored = verdict
+            print("parse失敗")
+        r["judge"] = scored
+        time.sleep(API_CALL_INTERVAL)
 
     return results
 
@@ -256,31 +382,59 @@ def main():
         choices=["ja", "en"],
         help="ベンチマーク言語 (デフォルト: ja)",
     )
+    parser.add_argument(
+        "--thinking",
+        type=int,
+        default=0,
+        help="extended thinking 有効化。budget_tokens を指定（例: 2000）。0で無効（デフォルト）",
+    )
+    parser.add_argument(
+        "--judge",
+        default="",
+        help="LLM-as-judge 採点モデル（例: claude-opus-4-7-20250929）。空なら採点スキップ",
+    )
+    parser.add_argument(
+        "--prompts",
+        default="",
+        help="カスタムプロンプトJSONファイルパス（指定なければlang既定）",
+    )
     args = parser.parse_args()
 
     client = Anthropic()
-    prompts_file = PROMPTS_FILE_EN if args.lang == "en" else PROMPTS_FILE_JA
+    if args.prompts:
+        prompts_file = Path(args.prompts)
+    else:
+        prompts_file = PROMPTS_FILE_EN if args.lang == "en" else PROMPTS_FILE_JA
     prompts = json.loads(prompts_file.read_text(encoding="utf-8"))
 
     print(f"モデル: {args.model}")
     print(f"言語: {args.lang}")
     print(f"試行回数: {args.trials}")
     print(f"プロンプト数: {len(prompts)}")
+    print(f"思考budget: {args.thinking if args.thinking else '無効'}")
     print()
 
-    results = run_benchmark(client, args.model, prompts, args.trials, lang=args.lang)
+    results = run_benchmark(
+        client, args.model, prompts, args.trials, lang=args.lang, thinking_budget=args.thinking
+    )
     table = print_table(results, lang=args.lang)
+
+    if args.judge:
+        print(f"\n=== LLM-as-judge 採点開始 (model={args.judge}) ===")
+        results = run_judge(client, args.judge, results)
 
     # 結果を保存
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    result_file = RESULTS_DIR / f"benchmark_{args.lang}_{timestamp}.json"
+    suffix = f"_think{args.thinking}" if args.thinking else ""
+    result_file = RESULTS_DIR / f"benchmark_{args.lang}{suffix}_{timestamp}.json"
     result_file.write_text(
         json.dumps(
             {
                 "model": args.model,
                 "lang": args.lang,
                 "trials": args.trials,
+                "thinking_budget": args.thinking,
                 "timestamp": timestamp,
                 "results": results,
             },

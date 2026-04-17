@@ -1,0 +1,12 @@
+[
+  {
+    "id": "git-rebase-merge",
+    "category": "解説",
+    "prompt": "git rebaseとmergeの違いを説明して"
+  },
+  {
+    "id": "postgres-race",
+    "category": "デバッグ",
+    "prompt": "PostgreSQLのレースコンディションをデバッグして"
+  }
+]
