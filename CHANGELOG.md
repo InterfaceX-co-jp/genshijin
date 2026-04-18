@@ -18,6 +18,11 @@
 - `plugin.json` description / keywords に commands・マルチエージェント対応反映、version 1.3.0 に bump
 - `benchmarks/run.py` のテーブル出力を 4アーム比較用に再構成（`通常` / `簡潔` / `caveman` / `genshijin`）
 
+### Fixed
+- `docs/index.html` モバイル／iOS レイアウト崩れ修正 — `自動化機能` / `genshijin-compress 使い始め` セクションで `.mode` カードを 600px 以下で縦並び化、`min-width: 100px` + `white-space: nowrap` による窮屈さ解消
+- iOS Safari スムーススクロール対応 — `pre` / `install-box code` / `.table-wrapper` / `.json-viewer` / `.example-card pre` に `-webkit-overflow-scrolling: touch` 追加
+- `install-box code` が長いコマンドで親要素をはみ出す問題を修正（横スクロール化 + Copy ボタン被り回避の `padding-right`）
+
 ## [1.2.0] - 2026-04-18
 
 ### Added
