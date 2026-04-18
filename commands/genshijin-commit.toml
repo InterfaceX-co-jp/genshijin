@@ -1,0 +1,2 @@
+description = "超圧縮コミットメッセージ生成（Conventional Commits、日本語/英語対応）"
+prompt = "現在のステージング変更に対する簡潔なコミットメッセージを生成。Conventional Commits形式。件名: ≤50文字・命令形・末尾ピリオドなし・type(scope): 要約。本文: 件名で自明なら省略。非自明な『なぜ』のみ記述。『何を』は diff で自明。言語はリポジトリ既存の git log 履歴に合わせる。AI帰属表記禁止。"

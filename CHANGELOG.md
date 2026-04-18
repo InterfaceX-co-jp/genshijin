@@ -4,6 +4,20 @@
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-04-18
+
+### Added
+- スラッシュコマンド定義 — `commands/genshijin.toml`（強度切替）・`commands/genshijin-commit.toml`（コミット生成）・`commands/genshijin-review.toml`（PRレビュー）
+- マルチエージェント rules ファイル — `.cursor/rules/genshijin.mdc`（Cursor）・`.windsurf/rules/genshijin.md`（Windsurf）・`.clinerules/genshijin.md`（Cline）・`.github/copilot-instructions.md`（Copilot）・`rules/genshijin-activate.md`（フック無しプラットフォーム向け共通アクティベーション）
+- `AGENTS.md` — サブスキル参照インデックス（Codex/Gemini CLI 等マルチエージェント互換）
+- standalone フックインストーラ — `hooks/install.sh` / `hooks/uninstall.sh` / `hooks/install.ps1` / `hooks/uninstall.ps1`。プラグイン未使用でも `settings.json` への安全マージで導入可能
+- `hooks/package.json`（`"type": "commonjs"`）— Node.js モジュール解決のための明示
+- ベンチマーク第4アーム `terse`（簡潔指示のみ） — `benchmarks/run.py` に追加。`genshijin vs 簡潔` 差分で skill 自体が terse 指示を超えて何％削減するかの誠実な指標を計測可能化
+
+### Changed
+- `plugin.json` description / keywords に commands・マルチエージェント対応反映、version 1.3.0 に bump
+- `benchmarks/run.py` のテーブル出力を 4アーム比較用に再構成（`通常` / `簡潔` / `caveman` / `genshijin`）
+
 ## [1.2.0] - 2026-04-18
 
 ### Added

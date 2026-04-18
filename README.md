@@ -190,6 +190,46 @@ JSON
 
 フラグファイル `~/.claude/.genshijin-active` は symlink 拒否・64バイト上限・モードホワイトリスト検証で保護。`~/.ssh/id_rsa` 等への symlink 差替えで secret バイトが statusline やモデルコンテキストに流れ込む攻撃を塞ぐ。
 
+## スラッシュコマンド（v1.3.0〜）
+
+プラグイン導入後、以下のコマンドが利用可能。
+
+- `/genshijin 丁寧|通常|極限` — 強度レベル切替
+- `/genshijin-commit` — 現在のステージング変更から簡潔なコミットメッセージ生成（Conventional Commits）
+- `/genshijin-review` — 現在のコード変更を1行1指摘でレビュー（`L42: 🔴 バグ: ...`）
+
+定義は [commands/](./commands/) 配下。
+
+## マルチエージェント対応（v1.3.0〜）
+
+Claude Code 以外の AI コーディングエージェントでも原始人モード利用可能:
+
+| エージェント | ファイル |
+|-------------|---------|
+| Cursor | [.cursor/rules/genshijin.mdc](./.cursor/rules/genshijin.mdc) |
+| Windsurf | [.windsurf/rules/genshijin.md](./.windsurf/rules/genshijin.md) |
+| Cline | [.clinerules/genshijin.md](./.clinerules/genshijin.md) |
+| GitHub Copilot | [.github/copilot-instructions.md](./.github/copilot-instructions.md) |
+| Codex / Gemini CLI 等 | [AGENTS.md](./AGENTS.md) |
+| フック無し共通 | [rules/genshijin-activate.md](./rules/genshijin-activate.md) |
+
+## Standalone インストーラ（v1.3.0〜）
+
+プラグイン未使用でも `~/.claude` 配下に直接フックを導入可能。
+
+```bash
+# インストール
+bash hooks/install.sh
+
+# 再インストール
+bash hooks/install.sh --force
+
+# アンインストール
+bash hooks/uninstall.sh
+```
+
+Windows は `hooks/install.ps1` / `hooks/uninstall.ps1`。`settings.json` への安全マージ（既存 statusline を尊重）。
+
 ## ベンチマーク
 
 <!-- BENCHMARK_START -->
@@ -300,7 +340,20 @@ genshijin/
 │   ├── genshijin-mode-tracker.js     # UserPromptSubmit: モード追跡 + 毎ターン補強
 │   ├── genshijin-config.js           # 設定解決（env var + config file）
 │   ├── genshijin-statusline.sh       # statusline バッジ（Unix）
-│   └── genshijin-statusline.ps1      # statusline バッジ（Windows）
+│   ├── genshijin-statusline.ps1      # statusline バッジ（Windows）
+│   ├── install.sh / uninstall.sh     # standalone インストーラ（v1.3.0〜）
+│   └── install.ps1 / uninstall.ps1   # standalone インストーラ Windows
+├── commands/                         # v1.3.0〜スラッシュコマンド定義
+│   ├── genshijin.toml                # /genshijin 強度切替
+│   ├── genshijin-commit.toml         # /genshijin-commit
+│   └── genshijin-review.toml         # /genshijin-review
+├── rules/                            # v1.3.0〜
+│   └── genshijin-activate.md         # フック無しプラットフォーム向け共通ルール
+├── .cursor/rules/                    # Cursor 用（v1.3.0〜）
+├── .windsurf/rules/                  # Windsurf 用（v1.3.0〜）
+├── .clinerules/                      # Cline 用（v1.3.0〜）
+├── .github/copilot-instructions.md   # GitHub Copilot 用（v1.3.0〜）
+├── AGENTS.md                         # マルチエージェント参照インデックス（v1.3.0〜）
 ├── .claude-plugin/
 │   ├── plugin.json                   # Claude Code プラグインマニフェスト（hooks 登録）
 │   └── marketplace.json              # マーケットプレイス定義

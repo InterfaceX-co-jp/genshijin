@@ -207,10 +207,10 @@ description: >
 
 ### P2 — 拡張性・誠実性
 
-- [ ] 8. Evals 3-arm 化（`"簡潔に"` 対照アーム追加）
-- [ ] 9. マルチエージェント rules ファイル（Cursor/Windsurf/Cline/Copilot）
-- [ ] 10. standalone `install.sh`/`uninstall.sh`
-- [ ] 11. スラッシュコマンド `.toml` 定義
+- [x] 8. Evals 3-arm 化（`"簡潔に"` 対照アーム追加）（2026-04-18 完了 · [benchmarks/run.py](../benchmarks/run.py) · `terse` アーム追加で誠実な `genshijin vs 簡潔` 差分を計測可能化）
+- [x] 9. マルチエージェント rules ファイル（Cursor/Windsurf/Cline/Copilot）（2026-04-18 完了 · [.cursor/rules/genshijin.mdc](../.cursor/rules/genshijin.mdc) · [.windsurf/rules/genshijin.md](../.windsurf/rules/genshijin.md) · [.clinerules/genshijin.md](../.clinerules/genshijin.md) · [.github/copilot-instructions.md](../.github/copilot-instructions.md) · [rules/genshijin-activate.md](../rules/genshijin-activate.md) · [AGENTS.md](../AGENTS.md)）
+- [x] 10. standalone `install.sh`/`uninstall.sh`（2026-04-18 完了 · [hooks/install.sh](../hooks/install.sh) · [hooks/uninstall.sh](../hooks/uninstall.sh) · [hooks/install.ps1](../hooks/install.ps1) · [hooks/uninstall.ps1](../hooks/uninstall.ps1)）
+- [x] 11. スラッシュコマンド `.toml` 定義（2026-04-18 完了 · [commands/genshijin.toml](../commands/genshijin.toml) · [commands/genshijin-commit.toml](../commands/genshijin-commit.toml) · [commands/genshijin-review.toml](../commands/genshijin-review.toml)）
 
 ### P3 — 話題性重視
 

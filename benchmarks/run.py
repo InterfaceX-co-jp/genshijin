@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """
 genshijin ベンチマーク
-通常応答 vs caveman vs genshijin モード応答のトークン使用量を比較する。
+通常 vs 簡潔（terse control） vs caveman vs genshijin の4アーム比較。
+
+「簡潔」アームは caveman 側の __terse__ 相当の対照群:
+  - 単に「簡潔に回答してください。」とだけ指示したベースライン
+  - `genshijin vs 簡潔` 差分 = skill 自体が terse 指示を超えて何％削減するかの誠実な指標
 
 使い方:
   pip install -r requirements.txt
@@ -30,6 +34,8 @@ DOCS_DIR = SCRIPT_DIR.parent / "docs"
 
 NORMAL_SYSTEM_JA = "あなたは親切で丁寧なソフトウェアエンジニアリングアシスタントです。日本語で回答してください。"
 NORMAL_SYSTEM_EN = "You are a helpful and thorough software engineering assistant. Respond in English."
+TERSE_SYSTEM_JA = "簡潔に回答してください。"
+TERSE_SYSTEM_EN = "Answer concisely."
 CAVEMAN_SUFFIX_JA = "\n\n日本語で回答してください。"
 
 
@@ -69,9 +75,11 @@ def run_benchmark(
     caveman_text = load_skill(CAVEMAN_SKILL_FILE)
     if lang == "ja":
         normal_system = NORMAL_SYSTEM_JA
+        terse_system = TERSE_SYSTEM_JA
         caveman_text += CAVEMAN_SUFFIX_JA
     else:
         normal_system = NORMAL_SYSTEM_EN
+        terse_system = TERSE_SYSTEM_EN
     results = []
 
     for prompt_data in prompts:
@@ -80,9 +88,11 @@ def run_benchmark(
         prompt = prompt_data["prompt"]
 
         normal_tokens = []
+        terse_tokens = []
         caveman_tokens = []
         genshijin_tokens = []
         normal_texts = []
+        terse_texts = []
         caveman_texts = []
         genshijin_texts = []
 
@@ -93,7 +103,7 @@ def run_benchmark(
                 flush=True,
             )
 
-            # 通常応答
+            # 通常応答（baseline）
             resp_normal = api_call_with_retry(
                 client,
                 model=model,
@@ -104,6 +114,20 @@ def run_benchmark(
             n_tokens = resp_normal.usage.output_tokens
             normal_tokens.append(n_tokens)
             normal_texts.append(resp_normal.content[0].text)
+
+            time.sleep(API_CALL_INTERVAL)
+
+            # 簡潔応答（terse control — caveman/genshijin skill 抜きで「簡潔に」指示のみ）
+            resp_terse = api_call_with_retry(
+                client,
+                model=model,
+                max_tokens=4096,
+                system=terse_system,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            t_tokens = resp_terse.usage.output_tokens
+            terse_tokens.append(t_tokens)
+            terse_texts.append(resp_terse.content[0].text)
 
             time.sleep(API_CALL_INTERVAL)
 
@@ -133,15 +157,18 @@ def run_benchmark(
             genshijin_tokens.append(g_tokens)
             genshijin_texts.append(resp_genshijin.content[0].text)
 
-            print(f"通常={n_tokens} caveman={cv_tokens} genshijin={g_tokens}")
+            print(f"通常={n_tokens} 簡潔={t_tokens} caveman={cv_tokens} genshijin={g_tokens}")
 
         median_normal = int(statistics.median(normal_tokens))
+        median_terse = int(statistics.median(terse_tokens))
         median_caveman = int(statistics.median(caveman_tokens))
         median_genshijin = int(statistics.median(genshijin_tokens))
+        saved_terse_pct = round((1 - median_terse / median_normal) * 100)
         saved_caveman_pct = round((1 - median_caveman / median_normal) * 100)
         saved_genshijin_pct = round((1 - median_genshijin / median_normal) * 100)
-        # genshijin vs caveman の改善率
+        # genshijin vs caveman / terse の改善率
         vs_caveman_pct = round((1 - median_genshijin / median_caveman) * 100) if median_caveman > 0 else 0
+        vs_terse_pct = round((1 - median_genshijin / median_terse) * 100) if median_terse > 0 else 0
 
         results.append(
             {
@@ -149,17 +176,22 @@ def run_benchmark(
                 "category": category,
                 "prompt": prompt,
                 "normal_tokens": normal_tokens,
+                "terse_tokens": terse_tokens,
                 "caveman_tokens": caveman_tokens,
                 "genshijin_tokens": genshijin_tokens,
                 "normal_texts": normal_texts,
+                "terse_texts": terse_texts,
                 "caveman_texts": caveman_texts,
                 "genshijin_texts": genshijin_texts,
                 "median_normal": median_normal,
+                "median_terse": median_terse,
                 "median_caveman": median_caveman,
                 "median_genshijin": median_genshijin,
+                "saved_terse_pct": saved_terse_pct,
                 "saved_caveman_pct": saved_caveman_pct,
                 "saved_genshijin_pct": saved_genshijin_pct,
                 "vs_caveman_pct": vs_caveman_pct,
+                "vs_terse_pct": vs_terse_pct,
             }
         )
 
@@ -169,42 +201,45 @@ def run_benchmark(
 def print_table(results: list[dict], lang: str = "ja") -> str:
     if lang == "en":
         header = [
-            "| Task | Normal | caveman | genshijin | caveman saved | genshijin saved | genshijin vs caveman |",
-            "|------|--------|---------|-----------|--------------|----------------|---------------------|",
+            "| Task | Normal | Terse | caveman | genshijin | gs saved | gs vs terse | gs vs caveman |",
+            "|------|--------|-------|---------|-----------|----------|-------------|---------------|",
         ]
         avg_label = "**Average**"
     else:
         header = [
-            "| タスク | 通常 | caveman | genshijin | caveman削減 | genshijin削減 | genshijin vs caveman |",
-            "|--------|------|---------|-----------|------------|-------------|---------------------|",
+            "| タスク | 通常 | 簡潔 | caveman | genshijin | genshijin削減 | gs vs 簡潔 | gs vs caveman |",
+            "|--------|------|------|---------|-----------|---------------|-----------|---------------|",
         ]
         avg_label = "**平均**"
 
     lines = list(header)
     total_normal = 0
+    total_terse = 0
     total_caveman = 0
     total_genshijin = 0
 
     for r in results:
         lines.append(
-            f"| {r['prompt'][:30]} | {r['median_normal']} | {r['median_caveman']} "
-            f"| {r['median_genshijin']} | {r['saved_caveman_pct']}% "
-            f"| {r['saved_genshijin_pct']}% | {r['vs_caveman_pct']}% |"
+            f"| {r['prompt'][:30]} | {r['median_normal']} | {r['median_terse']} "
+            f"| {r['median_caveman']} | {r['median_genshijin']} "
+            f"| {r['saved_genshijin_pct']}% | {r['vs_terse_pct']}% | {r['vs_caveman_pct']}% |"
         )
         total_normal += r["median_normal"]
+        total_terse += r["median_terse"]
         total_caveman += r["median_caveman"]
         total_genshijin += r["median_genshijin"]
 
     avg_normal = total_normal // len(results)
+    avg_terse = total_terse // len(results)
     avg_caveman = total_caveman // len(results)
     avg_genshijin = total_genshijin // len(results)
-    avg_saved_cv = round((1 - total_caveman / total_normal) * 100)
     avg_saved_gs = round((1 - total_genshijin / total_normal) * 100)
-    avg_vs = round((1 - total_genshijin / total_caveman) * 100) if total_caveman > 0 else 0
+    avg_vs_terse = round((1 - total_genshijin / total_terse) * 100) if total_terse > 0 else 0
+    avg_vs_cv = round((1 - total_genshijin / total_caveman) * 100) if total_caveman > 0 else 0
     lines.append(
-        f"| {avg_label} | **{avg_normal}** | **{avg_caveman}** "
-        f"| **{avg_genshijin}** | **{avg_saved_cv}%** "
-        f"| **{avg_saved_gs}%** | **{avg_vs}%** |"
+        f"| {avg_label} | **{avg_normal}** | **{avg_terse}** "
+        f"| **{avg_caveman}** | **{avg_genshijin}** "
+        f"| **{avg_saved_gs}%** | **{avg_vs_terse}%** | **{avg_vs_cv}%** |"
     )
 
     table = "\n".join(lines)
