@@ -155,6 +155,41 @@ claude --version
 
 誤検知時はファイル名変更で回避可能。
 
+## 自動化機能（v1.2.0〜）
+
+プラグイン導入後、Claude Code のフック機構で以下が自動で動く。
+
+### SessionStart フック — 原始人ルール注入
+セッション開始毎に `SKILL.md` を読み、現アクティブレベルの該当行のみフィルタして hidden context に注入。多ターン経過後の敬語回帰・フィラー漂流を防ぐ anchor。
+
+### UserPromptSubmit フック — モード追跡 + 毎ターン補強
+- `/genshijin 丁寧|通常|極限` や自然言語（「原始人モード」「原始人やめて」等）でモード切替を検出
+- アクティブ中は毎ユーザー発話で短い補強リマインダを注入 → 他プラグインが競合するスタイル指示を毎ターン注入する環境でもドリフト防止
+
+### Statusline バッジ
+現モードを `[原始人]` / `[原始人:丁寧]` / `[原始人:極限]` / `[原始人:コミット]` 等で可視化。初回セッションで未設定を検知したら Claude がセットアップを提案する。
+
+### 既定モードの設定（任意）
+
+優先度: 環境変数 > 設定ファイル > `normal`（デフォルト）。
+
+```bash
+# 環境変数（最優先）
+export GENSHIJIN_DEFAULT_MODE=extreme   # polite | normal | extreme | off
+
+# 設定ファイル
+mkdir -p ~/.config/genshijin
+cat > ~/.config/genshijin/config.json <<'JSON'
+{ "defaultMode": "extreme" }
+JSON
+```
+
+`off` を指定するとフックがルール注入をスキップしフラグも削除 — プラグインインストール済みのまま一時停止できる。
+
+### セキュリティ
+
+フラグファイル `~/.claude/.genshijin-active` は symlink 拒否・64バイト上限・モードホワイトリスト検証で保護。`~/.ssh/id_rsa` 等への symlink 差替えで secret バイトが statusline やモデルコンテキストに流れ込む攻撃を塞ぐ。
+
 ## ベンチマーク
 
 <!-- BENCHMARK_START -->
@@ -260,8 +295,14 @@ genshijin/
 │   └── genshijin-compress/
 │       ├── SKILL.md                  # メモリ圧縮サブスキル
 │       └── scripts/                  # Python CLI 実装
+├── hooks/                            # v1.2.0〜
+│   ├── genshijin-activate.js         # SessionStart: ルール注入
+│   ├── genshijin-mode-tracker.js     # UserPromptSubmit: モード追跡 + 毎ターン補強
+│   ├── genshijin-config.js           # 設定解決（env var + config file）
+│   ├── genshijin-statusline.sh       # statusline バッジ（Unix）
+│   └── genshijin-statusline.ps1      # statusline バッジ（Windows）
 ├── .claude-plugin/
-│   ├── plugin.json                   # Claude Code プラグインマニフェスト
+│   ├── plugin.json                   # Claude Code プラグインマニフェスト（hooks 登録）
 │   └── marketplace.json              # マーケットプレイス定義
 ├── benchmarks/
 │   ├── run.py                        # ベンチマークスクリプト
