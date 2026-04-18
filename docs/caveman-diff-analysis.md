@@ -199,9 +199,11 @@ description: >
 
 ### P1 — 中規模・効果持続
 
-- [ ] 5. SessionStart + UserPromptSubmit フック実装（モード追跡・毎ターン補強・ドリフト防止）
-- [ ] 6. Statusline badge（`[原始人]`, `[原始人:極限]` 等）
-- [ ] 7. 設定解決（env var + config file）
+- [x] 5. SessionStart + UserPromptSubmit フック実装（モード追跡・毎ターン補強・ドリフト防止）（2026-04-18 完了 · [hooks/genshijin-activate.js](../hooks/genshijin-activate.js) · [hooks/genshijin-mode-tracker.js](../hooks/genshijin-mode-tracker.js)）
+- [x] 6. Statusline badge（`[原始人]`, `[原始人:極限]` 等）（2026-04-18 完了 · [hooks/genshijin-statusline.sh](../hooks/genshijin-statusline.sh) · [hooks/genshijin-statusline.ps1](../hooks/genshijin-statusline.ps1)）
+- [x] 7. 設定解決（env var + config file）（2026-04-18 完了 · [hooks/genshijin-config.js](../hooks/genshijin-config.js) · `GENSHIJIN_DEFAULT_MODE` / `~/.config/genshijin/config.json`）
+- [x] 7a. SKILL.md に永続性セクション追加（2026-04-18 · ドリフト防止のモデル anchor）
+- [x] 7b. plugin.json に hooks 登録 + version 1.2.0（2026-04-18）
 
 ### P2 — 拡張性・誠実性
 
