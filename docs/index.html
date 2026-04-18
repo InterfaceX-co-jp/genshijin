@@ -703,6 +703,62 @@
     </section>
 
     <section>
+      <h2>genshijin-compress の使い始め</h2>
+      <p style="color: var(--text-muted); margin-bottom: 16px; font-size: 0.9rem;">
+        <code>CLAUDE.md</code> はセッション開始毎に読込 → 圧縮で<strong>毎回</strong>の入力トークンを削減。
+      </p>
+
+      <div class="modes">
+        <div class="mode" style="flex-direction: column; align-items: stretch;">
+          <div class="mode-name" style="margin-bottom: 8px;">1. 前提準備</div>
+          <div class="mode-desc">
+            Python 3.10+ に加え、以下いずれか。
+            <pre style="background: #111; border-radius: 6px; padding: 10px 12px; margin: 8px 0 0; overflow-x: auto; font-size: 0.75rem; line-height: 1.5;"><code># オプションA: API key 直接利用
+pip install anthropic
+export ANTHROPIC_API_KEY=sk-ant-...
+
+# オプションB: claude CLI ログイン済みなら追加設定不要
+claude --version</code></pre>
+          </div>
+        </div>
+
+        <div class="mode" style="flex-direction: column; align-items: stretch;">
+          <div class="mode-name" style="margin-bottom: 8px;">2. 対象ファイル選定</div>
+          <div class="mode-desc">
+            典型的な圧縮対象:
+            <ul style="margin: 8px 0 0; padding-left: 20px; line-height: 1.7;">
+              <li><code>~/.claude/CLAUDE.md</code> — ユーザー全体メモリ（全セッションで毎回読込）</li>
+              <li><code>./CLAUDE.md</code> — プロジェクト単位メモリ</li>
+              <li><code>~/.claude/projects/&lt;project&gt;/memory/MEMORY.md</code> — auto memory インデックス</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="mode" style="flex-direction: column; align-items: stretch;">
+          <div class="mode-name" style="margin-bottom: 8px;">3. 圧縮実行</div>
+          <div class="mode-desc">
+            <pre style="background: #111; border-radius: 6px; padding: 10px 12px; margin: 0 0 8px; overflow-x: auto; font-size: 0.75rem; line-height: 1.5;"><code>/genshijin-compress ~/.claude/CLAUDE.md</code></pre>
+            結果:
+            <ul style="margin: 8px 0 0; padding-left: 20px; line-height: 1.7;">
+              <li>圧縮版が原ファイルを上書き</li>
+              <li>人間可読版は <code>CLAUDE.original.md</code> にバックアップ（復元可能）</li>
+              <li>失敗時は原ファイル無変更</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="mode" style="flex-direction: column; align-items: stretch;">
+          <div class="mode-name" style="margin-bottom: 8px;">保持・拒否ルール</div>
+          <div class="mode-desc">
+            <strong>完全保持:</strong> コードブロック / URL / ファイルパス / 数値 / 見出し / 技術用語<br>
+            <strong>自動拒否:</strong> <code>.env</code> / <code>credentials.*</code> / <code>id_rsa</code> / <code>.ssh/</code> 配下 等<br>
+            <span style="color: var(--text-muted); font-size: 0.85rem;">誤検知時はファイル名変更で回避可能。</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
       <h2>日本語への最適化</h2>
       <p style="color: var(--text-muted); margin-bottom: 16px; font-size: 0.9rem;">
         英語版 <a href="https://github.com/JuliusBrussee/caveman" style="color: var(--accent);">caveman</a> をベースに、日本語特有の冗長表現に最適化。
