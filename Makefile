@@ -42,8 +42,13 @@ release-commit: ## bump 後に commit + tag を作成（未 push）
 	echo "次: make release-push"
 
 release-push: ## commit と tag を push（リリース workflow 起動）
-	@NEW_VERSION=$$(python3 -c "import json; print(json.load(open('.claude-plugin/plugin.json'))['version'])"); \
+	@set -e; \
+	NEW_VERSION=$$(python3 -c "import json; print(json.load(open('.claude-plugin/plugin.json'))['version'])"); \
 	BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
+	if ! git rev-parse -q --verify "refs/tags/v$$NEW_VERSION" >/dev/null; then \
+		echo "❌ tag v$$NEW_VERSION が存在しません。先に make release-commit を実行してください。"; \
+		exit 1; \
+	fi; \
 	echo "push 先: origin/$$BRANCH + tag v$$NEW_VERSION"; \
 	read -p "続行しますか？ [y/N]: " ans; \
 	if [ "$$ans" != "y" ] && [ "$$ans" != "Y" ]; then echo "中止。"; exit 1; fi; \

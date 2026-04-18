@@ -2,10 +2,8 @@ name: Run Benchmark
 
 on:
   push:
-    branches: ["main"]
-    paths:
-      - 'skills/**'
-      - 'benchmarks/**'
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       lang:
@@ -29,8 +27,11 @@ jobs:
       matrix:
         lang: ${{ fromJSON(github.event_name == 'push' && '["ja"]' || inputs.lang == 'both' && '["ja","en"]' || format('["{0}"]', inputs.lang)) }}
     steps:
-      - name: Checkout
+      - name: Checkout main
         uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
