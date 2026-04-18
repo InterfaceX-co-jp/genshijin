@@ -12,8 +12,11 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout main
         uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
 
       - name: Extract version from tag
         id: version
@@ -33,19 +36,108 @@ jobs:
           fi
           echo "✅ plugin.json version == tag == $TAG_VERSION"
 
-      - name: Extract CHANGELOG section
-        id: changelog
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install benchmark dependencies
+        run: pip install -r benchmarks/requirements.txt
+
+      - name: Run benchmark (ja)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          cd benchmarks
+          python run.py --lang ja --trials 3 --tag ${{ steps.version.outputs.tag }} --update-readme --update-docs
+
+      - name: Bust star-history cache in README
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          import pathlib
+
+          tag = os.environ["TAG"]
+          readme = pathlib.Path("README.md")
+          text = readme.read_text(encoding="utf-8")
+
+          def replace(match):
+              url = match.group(0)
+              url = re.sub(r"&cb=[^\"&\s]*", "", url)
+              return url + f"&cb={tag}"
+
+          new_text = re.sub(
+              r"https://api\.star-history\.com/chart\?[^\"\s]+",
+              replace,
+              text,
+          )
+          if new_text != text:
+              readme.write_text(new_text, encoding="utf-8")
+              print(f"README.md: star-history URL に cb={tag} を追加")
+          else:
+              print("README.md: star-history URL 見つからず。スキップ")
+          PY
+
+      - name: Commit benchmark results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add README.md docs/benchmark.json "benchmarks/results/${{ steps.version.outputs.tag }}_ja.json"
+          git diff --staged --quiet || git commit -m "ベンチマーク結果を更新 (${{ steps.version.outputs.tag }}) [skip benchmark]"
+          git pull --rebase
+          git push
+
+      - name: Build release notes
+        id: notes
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           python3 - <<'PY' > release-notes.md
-          import re, pathlib, sys
-          version = "${{ steps.version.outputs.version }}"
+          import json
+          import os
+          import pathlib
+          import re
+          import sys
+
+          version = os.environ["VERSION"]
+          tag = os.environ["TAG"]
+
+          # CHANGELOG セクション抽出
           text = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8")
           pattern = rf"^## \[{re.escape(version)}\][^\n]*\n(.*?)(?=^## \[|\Z)"
           m = re.search(pattern, text, flags=re.DOTALL | re.MULTILINE)
           if not m:
               sys.stderr.write(f"CHANGELOG.md に [{version}] セクションが見つからない。\n")
               sys.exit(1)
-          sys.stdout.write(m.group(1).strip() + "\n")
+          changelog_section = m.group(1).strip()
+
+          # ベンチマーク結果読込
+          bench_path = pathlib.Path(f"benchmarks/results/{tag}_ja.json")
+          bench_md = ""
+          if bench_path.exists():
+              data = json.loads(bench_path.read_text(encoding="utf-8"))
+              results = data["results"]
+              total_n = sum(r["median_normal"] for r in results)
+              total_c = sum(r["median_caveman"] for r in results)
+              total_g = sum(r["median_genshijin"] for r in results)
+              saved_cv = round((1 - total_c / total_n) * 100)
+              saved_gs = round((1 - total_g / total_n) * 100)
+              vs_cv = round((1 - total_g / total_c) * 100) if total_c > 0 else 0
+              repo = os.environ.get("GITHUB_REPOSITORY", "")
+              link = f"https://github.com/{repo}/blob/main/benchmarks/results/{tag}_ja.json"
+              bench_md = (
+                  "\n\n## ベンチマーク結果 (ja, trials=3)\n\n"
+                  f"- モデル: `{data['model']}`\n"
+                  f"- 平均トークン削減: **genshijin {saved_gs}%** / caveman {saved_cv}%\n"
+                  f"- genshijin vs caveman: **{vs_cv}%** 追加削減\n"
+                  f"- 詳細JSON: [{tag}_ja.json]({link}) (Release assets にも添付)\n"
+              )
+
+          sys.stdout.write(changelog_section + bench_md + "\n")
           PY
           echo '--- release-notes.md ---'
           cat release-notes.md
@@ -53,8 +145,14 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
-          gh release create "${{ steps.version.outputs.tag }}" \
-            --title "${{ steps.version.outputs.tag }}" \
+          ASSET=""
+          if [ -f "benchmarks/results/${TAG}_ja.json" ]; then
+            ASSET="benchmarks/results/${TAG}_ja.json"
+          fi
+          gh release create "$TAG" \
+            --title "$TAG" \
             --notes-file release-notes.md \
-            --verify-tag
+            --verify-tag \
+            $ASSET

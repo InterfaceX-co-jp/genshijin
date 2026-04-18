@@ -256,6 +256,11 @@ def main():
         choices=["ja", "en"],
         help="ベンチマーク言語 (デフォルト: ja)",
     )
+    parser.add_argument(
+        "--tag",
+        default=None,
+        help="出力ファイル名に使うタグ (例: v1.2.0)。指定時 results/{tag}_{lang}.json に保存",
+    )
     args = parser.parse_args()
 
     client = Anthropic()
@@ -274,7 +279,10 @@ def main():
     # 結果を保存
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    result_file = RESULTS_DIR / f"benchmark_{args.lang}_{timestamp}.json"
+    if args.tag:
+        result_file = RESULTS_DIR / f"{args.tag}_{args.lang}.json"
+    else:
+        result_file = RESULTS_DIR / f"benchmark_{args.lang}_{timestamp}.json"
     result_file.write_text(
         json.dumps(
             {
@@ -282,6 +290,7 @@ def main():
                 "lang": args.lang,
                 "trials": args.trials,
                 "timestamp": timestamp,
+                "tag": args.tag,
                 "results": results,
             },
             ensure_ascii=False,

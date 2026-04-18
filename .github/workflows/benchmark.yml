@@ -1,9 +1,6 @@
 name: Run Benchmark
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       lang:
@@ -21,11 +18,10 @@ permissions:
 jobs:
   benchmark:
     runs-on: ubuntu-latest
-    if: "!contains(github.event.head_commit.message, '[skip benchmark]')"
     strategy:
       max-parallel: 1
       matrix:
-        lang: ${{ fromJSON(github.event_name == 'push' && '["ja"]' || inputs.lang == 'both' && '["ja","en"]' || format('["{0}"]', inputs.lang)) }}
+        lang: ${{ fromJSON(inputs.lang == 'both' && '["ja","en"]' || format('["{0}"]', inputs.lang)) }}
     steps:
       - name: Checkout main
         uses: actions/checkout@v4
