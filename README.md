@@ -230,6 +230,34 @@ bash hooks/uninstall.sh
 
 Windows は `hooks/install.ps1` / `hooks/uninstall.ps1`。`settings.json` への安全マージ（既存 statusline を尊重）。
 
+## アップデート
+
+### プラグイン版（推奨）
+
+```bash
+# マーケットプレイス側を最新取得
+claude plugin marketplace update genshijin
+
+# プラグイン本体を更新（再起動で適用）
+claude plugin update genshijin@genshijin
+```
+
+Claude Code 内の `/plugin update genshijin` が使える環境ではそれでも可。インストール済バージョン確認は `claude plugin list`。
+
+### Standalone 版
+
+```bash
+cd /path/to/genshijin
+git pull
+bash hooks/install.sh --force   # Windows: hooks/install.ps1 -Force
+```
+
+### npx skills 版
+
+```bash
+npx skills add InterfaceX-co-jp/genshijin   # 上書き再取得
+```
+
 ## ベンチマーク
 
 <!-- BENCHMARK_START -->
