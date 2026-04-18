@@ -113,16 +113,47 @@ claude --plugin-dir ./path/to/genshijin
 
 ### genshijin-compress について
 
-`CLAUDE.md` はセッション開始毎に読み込まれる。圧縮すると **毎回** の入力トークンが減る。
+`CLAUDE.md` はセッション開始毎に読込 → 圧縮で **毎回** の入力トークン削減。
+
+#### 使い始め（3ステップ）
+
+**1. 前提準備**
+
+Python 3.10+ に加え、以下いずれか:
 
 ```bash
-/genshijin-compress CLAUDE.md
+# オプションA: API key 直接利用
+pip install anthropic
+export ANTHROPIC_API_KEY=sk-ant-...
+
+# オプションB: claude CLI ログイン済みなら 追加設定不要（CLI fallback）
+claude --version
 ```
 
-- 圧縮版が `CLAUDE.md` を上書き、人間可読版は `CLAUDE.original.md` にバックアップ
-- コードブロック・URL・ファイルパス・数値・見出しは完全保持
-- 機密ファイル（`.env`, `credentials.*`, `id_rsa`, `.ssh/` 配下等）は自動拒否
-- Python 3.10+ と `ANTHROPIC_API_KEY` または `claude` CLI が必要
+**2. 対象ファイル選定**
+
+典型的な圧縮対象:
+- `~/.claude/CLAUDE.md` — ユーザー全体メモリ（全セッションで毎回読込）
+- `./CLAUDE.md` — プロジェクト単位メモリ
+- `~/.claude/projects/<project>/memory/MEMORY.md` — auto memory インデックス
+
+**3. 圧縮実行**
+
+```
+/genshijin-compress ~/.claude/CLAUDE.md
+```
+
+結果:
+- 圧縮版が原ファイルを上書き
+- 人間可読版は `CLAUDE.original.md` にバックアップ（復元可能）
+- 失敗時は原ファイル無変更
+
+#### 保持・拒否ルール
+
+- **完全保持**: コードブロック / URL / ファイルパス / 数値 / 見出し / 技術用語
+- **自動拒否**: `.env` / `credentials.*` / `id_rsa` / `.ssh/` 配下 等
+
+誤検知時はファイル名変更で回避可能。
 
 ## ベンチマーク
 
