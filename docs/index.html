@@ -4,15 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>genshijin - Claude Code Plugin</title>
-  <meta name="description" content="Claude Code向け超圧縮コミュニケーションスキル。トークン使用量を約75%削減しつつ、技術的正確性は100%維持。">
+  <meta name="description" content="Claude Code向け超圧縮コミュニケーションスキル。トークン使用量を約75%削減しつつ、技術的正確性は100%維持。コミット・PRレビュー・メモリ圧縮サブスキル同梱。">
   <meta property="og:title" content="genshijin - Claude Code 超圧縮スキル">
-  <meta property="og:description" content="トークン使用量を約75%削減しつつ、技術的正確性は100%維持する Claude Code プラグイン">
+  <meta property="og:description" content="トークン使用量を約75%削減しつつ、技術的正確性は100%維持。コミット・PRレビュー・メモリ圧縮サブスキル同梱の Claude Code プラグイン">
   <meta property="og:image" content="https://interfacex-co-jp.github.io/genshijin/ogp.png">
   <meta property="og:url" content="https://interfacex-co-jp.github.io/genshijin/">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="genshijin - Claude Code 超圧縮スキル">
-  <meta name="twitter:description" content="トークン使用量を約75%削減しつつ、技術的正確性は100%維持">
+  <meta name="twitter:description" content="トークン使用量を約75%削減しつつ、技術的正確性は100%維持。サブスキル4個同梱。">
   <meta name="twitter:image" content="https://interfacex-co-jp.github.io/genshijin/ogp.png">
   <style>
     :root {
@@ -545,6 +545,31 @@
         <div class="mode">
           <div class="mode-name"><code>/genshijin 極限</code></div>
           <div class="mode-desc">略語・矢印記法・一語回答。電報のような最大圧縮。</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>サブスキル</h2>
+      <p style="color: var(--text-muted); margin-bottom: 16px; font-size: 0.9rem;">
+        本体 <code>/genshijin</code> に加え、用途別サブスキル4個同梱。
+      </p>
+      <div class="modes">
+        <div class="mode">
+          <div class="mode-name"><code>/genshijin-commit</code></div>
+          <div class="mode-desc">Conventional Commits 形式の簡潔コミットメッセージ。件名≤50文字、「なぜ」重視。</div>
+        </div>
+        <div class="mode">
+          <div class="mode-name"><code>/genshijin-review</code></div>
+          <div class="mode-desc">1行PRコメント。<code>L42: 🔴 バグ: user null。ガード追加。</code> の形式。</div>
+        </div>
+        <div class="mode">
+          <div class="mode-name"><code>/genshijin-compress</code></div>
+          <div class="mode-desc"><code>CLAUDE.md</code> 等のメモリファイルを原始人モード化。入力トークンを永続削減。コード・URL・見出しは完全保持、機密ファイルは自動拒否。</div>
+        </div>
+        <div class="mode">
+          <div class="mode-name"><code>/genshijin-help</code></div>
+          <div class="mode-desc">全モード・サブスキル・設定方法のリファレンスカード表示。</div>
         </div>
       </div>
     </section>
