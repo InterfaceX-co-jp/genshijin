@@ -704,6 +704,45 @@
     </section>
 
     <section>
+      <h2>自動化機能 <span style="color: var(--text-muted); font-size: 0.9rem; font-weight: 400;">v1.2.0〜</span></h2>
+      <p style="color: var(--text-muted); margin-bottom: 16px; font-size: 0.9rem;">
+        プラグイン導入後、Claude Code のフック機構で以下が自動で動く。
+      </p>
+      <div class="modes">
+        <div class="mode">
+          <div class="mode-name">SessionStart フック</div>
+          <div class="mode-desc"><code>SKILL.md</code> を読みアクティブレベル行のみフィルタして hidden context に注入。多ターン経過後の敬語回帰・フィラー漂流を防ぐ anchor。</div>
+        </div>
+        <div class="mode">
+          <div class="mode-name">UserPromptSubmit フック</div>
+          <div class="mode-desc"><code>/genshijin</code> 系コマンドや自然言語でモード切替を検出。毎ターン短い補強リマインダを注入して他プラグインとの競合ドリフトを防止。</div>
+        </div>
+        <div class="mode">
+          <div class="mode-name">Statusline バッジ</div>
+          <div class="mode-desc">現モードを <code>[原始人]</code> / <code>[原始人:極限]</code> 等で可視化。未設定時は Claude がセットアップを提案。</div>
+        </div>
+        <div class="mode" style="flex-direction: column; align-items: stretch;">
+          <div class="mode-name" style="margin-bottom: 8px;">既定モードの設定</div>
+          <div class="mode-desc">
+            優先度: 環境変数 > 設定ファイル > <code>normal</code>。
+            <pre style="background: #111; border-radius: 6px; padding: 10px 12px; margin: 8px 0 0; overflow-x: auto; font-size: 0.75rem; line-height: 1.5;"><code># 環境変数（最優先）
+export GENSHIJIN_DEFAULT_MODE=extreme
+
+# 設定ファイル
+mkdir -p ~/.config/genshijin
+echo '{"defaultMode":"extreme"}' \
+  &gt; ~/.config/genshijin/config.json</code></pre>
+            <span style="color: var(--text-muted); font-size: 0.85rem; display: block; margin-top: 8px;"><code>off</code> 指定でルール注入スキップ（一時停止）。</span>
+          </div>
+        </div>
+        <div class="mode">
+          <div class="mode-name">セキュリティ</div>
+          <div class="mode-desc">フラグファイルは symlink 拒否・64バイト上限・モードホワイトリスト検証。秘密ファイルへの symlink 差替えで secret バイトが statusline やモデルコンテキストに流れ込む攻撃を塞ぐ。</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
       <h2>genshijin-compress の使い始め</h2>
       <p style="color: var(--text-muted); margin-bottom: 16px; font-size: 0.9rem;">
         <code>CLAUDE.md</code> はセッション開始毎に読込 → 圧縮で<strong>毎回</strong>の入力トークンを削減。
