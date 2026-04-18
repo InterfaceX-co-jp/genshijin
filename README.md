@@ -2,6 +2,10 @@
 
 > なぜ多くトークン使う？少なくて済む🗿
 
+[![Claude Code Plugin](https://img.shields.io/badge/Claude%20Code%20Plugin-%E5%85%AC%E9%96%8B%E6%B8%88-brightgreen)](https://claude.ai/settings/plugins)
+
+Claude Code 公式プラグインディレクトリに公開済み。`/plugin install genshijin` でワンライナーインストール。
+
 Claude Code / Codex 向けの超圧縮コミュニケーションスキル。[caveman](https://github.com/JuliusBrussee/caveman) の日本語版をベースに、日本語特有の冗長表現に最適化。
 
 トークン使用量を **約75%削減** しつつ、技術的正確性は100%維持。
@@ -21,14 +25,24 @@ Claude Code / Codex 向けの超圧縮コミュニケーションスキル。[ca
 
 ## インストール
 
-### 方法1: Claude Code プラグイン（推奨）
+### 方法1: Claude Code 公式プラグインディレクトリ（推奨）
 
 Claude Code 内で以下を実行:
 
 ```
-/plugin install genshijin@InterfaceX-co-jp/genshijin
-claude plugin marketplace add InterfaceX-co-jp/genshijin
+/plugin install genshijin
 ```
+
+Anthropic 公式 [プラグインディレクトリ](https://claude.ai/settings/plugins) に公開済み。marketplace add 不要。
+
+### 方法1b: GitHub 直接インストール（開発版）
+
+```
+claude plugin marketplace add InterfaceX-co-jp/genshijin
+/plugin install genshijin@InterfaceX-co-jp/genshijin
+```
+
+main ブランチ最新を取得したい場合。
 
 ### 方法2: npx skills（サードパーティ）
 
