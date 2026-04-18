@@ -128,6 +128,10 @@
       color: var(--accent);
       display: block;
       user-select: all;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      white-space: nowrap;
+      padding-right: 72px;
     }
 
     .copy-btn {
@@ -267,6 +271,7 @@
       padding: 10px 12px;
       margin: 6px 0;
       overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
     }
 
     .example-card pre code {
@@ -317,6 +322,12 @@
     .mode-desc {
       color: var(--text-muted);
       font-size: 0.9rem;
+      min-width: 0;
+    }
+
+    .mode-desc pre {
+      -webkit-overflow-scrolling: touch;
+      max-width: 100%;
     }
 
     /* Features */
@@ -380,6 +391,7 @@
     /* Table */
     .table-wrapper {
       overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
       border-radius: 10px;
       border: 1px solid var(--border);
     }
@@ -428,6 +440,7 @@
       padding: 20px;
       max-height: 600px;
       overflow: auto;
+      -webkit-overflow-scrolling: touch;
       font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
       font-size: 0.8rem;
       line-height: 1.6;
