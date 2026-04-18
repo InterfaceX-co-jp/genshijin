@@ -44,7 +44,8 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Verify plugin.json version matches tag
+      - name: Verify plugin.json version matches tag (push tag 時のみ)
+        if: github.event_name == 'push'
         run: |
           MANIFEST_VERSION=$(python3 -c "import json; print(json.load(open('.claude-plugin/plugin.json'))['version'])")
           TAG_VERSION="${{ steps.version.outputs.version }}"
