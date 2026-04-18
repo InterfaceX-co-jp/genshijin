@@ -1,5 +1,10 @@
 [注意]AIに書かせた記事をそのまま私の方でレビューして掲載しています。
-Claudeマーケットプレイスにだしたらまた更新するかも？よろしくおねがいします。
+~~Claudeマーケットプレイスにだしたらまた更新するかも？よろしくおねがいします。~~
+
+@追記: 2026年4月18日
+![](https://storage.googleapis.com/zenn-user-upload/1e23d98cbf46-20260418.png)
+- Claudeのマーケットプレイスに無事公開されました🎉
+- [`genshijin@v1.3.0`](https://github.com/InterfaceX-co-jp/genshijin/releases/tag/v1.3.0)を公開しました。マルチエージェント対応やセキュリティ対応、ベンチマーク更新などを含めています
 
 ## TL;DR
 
@@ -466,16 +471,75 @@ curl -o ~/.claude/skills/genshijin/SKILL.md \
 
 `原始人やめて` で解除。
 
-## 補記：v1.2.0 の自動化機能
+## 補記：v1.3.0 時点の自動化・拡張機能
 
-v1.2.0 で Claude Code のフック機構に対応した。プラグイン導入後、以下が自動で動く。
+圧縮スキルの最大の弱点は「**数ターン後に忘れる**」ことだ。セッション冒頭で `/genshijin` を叩いても、20〜30ターン経過すると敬語が回帰し、フィラーが漂流して元の冗長モードに戻る。プロンプト1発では永続化しない。
 
-- **SessionStart フック**: セッション開始毎に `SKILL.md` から現アクティブレベルの該当行のみフィルタして hidden context に注入。多ターン経過後の敬語回帰・フィラー漂流を防ぐ anchor として機能する。
-- **UserPromptSubmit フック**: `/genshijin` 系コマンドや自然言語トリガー（「原始人モード」「原始人やめて」等）でモード切替を追跡。アクティブ中は毎ターン短い補強リマインダを注入して、他プラグインがスタイル指示を毎ターン注入する環境でもドリフトを防ぐ。
+genshijin はこの問題を v1.2.0 でフック機構に対応して解決し、v1.3.0 で対応環境を Claude Code 外にも広げた。
+
+### 自動化フック（v1.2.0〜）
+
+Claude Code プラグイン導入後、以下が自動で動く。
+
+- **SessionStart フック** (`hooks/genshijin-activate.js`): セッション開始毎に `SKILL.md` から現アクティブレベルの該当行のみフィルタして hidden context に注入。多ターン経過後の敬語回帰・フィラー漂流を防ぐ anchor として機能する。
+- **UserPromptSubmit フック** (`hooks/genshijin-mode-tracker.js`): `/genshijin` 系コマンドや自然言語トリガー（「原始人モード」「原始人やめて」等）でモード切替を追跡。アクティブ中は毎ターン短い補強リマインダを注入して、他プラグインがスタイル指示を毎ターン注入する環境でもドリフトを防ぐ。
 - **Statusline バッジ**: `[原始人]` / `[原始人:極限]` / `[原始人:コミット]` 等で現モード可視化。
-- **既定モード設定**: `GENSHIJIN_DEFAULT_MODE` 環境変数、または `~/.config/genshijin/config.json` で上書き可能。`off` 指定で一時停止（アンインストール不要）。
+- **既定モード設定**: `GENSHIJIN_DEFAULT_MODE` 環境変数、または `~/.config/genshijin/config.json`（XDG対応）で上書き可能。`off` 指定で一時停止（アンインストール不要）。
 
-モデル内部挙動に頼る圧縮スキルは「数ターン後に忘れる」のが最大の弱点だったが、フックで毎ターン再注入する構成にして anchor を常時効かせている。加えて、フラグファイルは symlink 拒否・64バイト上限・モードホワイトリスト検証で保護しており、`~/.ssh/id_rsa` 等への symlink 差替えで secret バイトが statusline やモデルコンテキストに流れ込む攻撃経路を塞ぐ設計にした。
+フラグファイル `~/.claude/.genshijin-active` は symlink 拒否・64バイト上限・モードホワイトリスト検証で保護。親ディレクトリの symlink 差替えで `~/.ssh/id_rsa` 等の secret バイトが statusline やモデルコンテキストに流れ込む攻撃経路を、`O_NOFOLLOW` + temp+rename アトミック書込 + `0o600` パーミッションで塞ぐ設計にした。
+
+### スラッシュコマンド（v1.3.0〜）
+
+v1.3.0 で `commands/` 配下にコマンド定義を追加。強度切替・コミット生成・PRレビューを単発呼び出しできる。
+
+```
+/genshijin          # 通常モード（デフォルト）
+/genshijin 丁寧     # ビジネス向け
+/genshijin 極限     # 最大圧縮
+/genshijin-commit   # Conventional Commits 形式の簡潔コミットメッセージ生成
+/genshijin-review   # 1行PRコメント（L42: 🔴 バグ: ...）
+/genshijin-help     # 全モード・サブスキル リファレンスカード
+```
+
+### マルチエージェント対応（v1.3.0〜）
+
+Claude Code 以外の環境でも同じ圧縮ルールを効かせるため、主要 AI エージェント向け rules ファイルを同梱した。
+
+- `.cursor/rules/genshijin.mdc` — Cursor
+- `.windsurf/rules/genshijin.md` — Windsurf
+- `.clinerules/genshijin.md` — Cline
+- `.github/copilot-instructions.md` — GitHub Copilot
+- `AGENTS.md` — Codex / Gemini CLI 等のサブスキル参照インデックス
+- `rules/genshijin-activate.md` — フック機構を持たないプラットフォーム向け共通アクティベーション
+
+### Standalone フックインストーラ（v1.3.0〜）
+
+Claude Code プラグイン機構を使わずに、フックだけを手動導入したいケース向け。
+
+```bash
+# macOS / Linux
+./hooks/install.sh
+./hooks/uninstall.sh
+
+# Windows
+./hooks/install.ps1
+./hooks/uninstall.ps1
+```
+
+既存 `~/.claude/settings.json` への安全マージ（既存エントリ破壊なし・重複追加なし）で SessionStart / UserPromptSubmit / Statusline を導入する。
+
+### ベンチマーク第4アーム `terse`（v1.3.0〜）
+
+「genshijin の削減効果は、単に『簡潔に答えて』と指示すれば再現できるのでは？」という疑問への正直な回答として、第4アーム `terse`（簡潔指示のみ・ルール無し）を追加した。
+
+現行ベンチマークは4アーム比較になっている。
+
+- `通常`（敬語あり）
+- `簡潔`（terse 指示のみ）
+- `caveman`（英語圧縮スキル）
+- `genshijin`（日本語特化スキル）
+
+`genshijin vs 簡潔` の差分こそが、skill 自体が汎用的な terse 指示を超えて削減する純粋な効果量になる。
 
 ## まとめ
 
