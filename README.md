@@ -279,39 +279,39 @@ npx skills add InterfaceX-co-jp/genshijin   # 上書き再取得
 ## ベンチマーク
 
 <!-- BENCHMARK_START -->
-| タスク | 通常 | caveman | genshijin | caveman削減 | genshijin削減 | genshijin vs caveman |
-|--------|------|---------|-----------|------------|-------------|---------------------|
-| なぜReactコンポーネントが毎回再レンダリングされるのか説 | 1415 | 341 | 181 | 76% | 87% | 47% |
-| 認証ミドルウェアのトークン有効期限チェックにバグがある。修正 | 1721 | 199 | 91 | 88% | 95% | 54% |
-| Node.jsでPostgreSQLのコネクションプーリング | 2107 | 539 | 324 | 74% | 85% | 40% |
-| git rebaseとmergeの違いを説明して | 822 | 317 | 177 | 61% | 78% | 44% |
-| コールバック地獄をasync/awaitにリファクタリングし | 1468 | 469 | 302 | 68% | 79% | 36% |
-| マイクロサービスとモノリスの比較を説明して | 1004 | 432 | 266 | 57% | 74% | 38% |
-| ExpressルートのPRをセキュリティ観点でレビューして | 1307 | 278 | 142 | 79% | 89% | 49% |
-| Dockerのマルチステージビルドを設定して | 1391 | 354 | 202 | 75% | 85% | 43% |
-| PostgreSQLのレースコンディションをデバッグして | 1680 | 618 | 362 | 63% | 78% | 41% |
-| ReactのError Boundaryを実装して | 2621 | 443 | 257 | 83% | 90% | 42% |
-| CORSエラーが出る。原因と解決策を教えて | 1038 | 389 | 293 | 63% | 72% | 25% |
-| Nginxのリバースプロキシ設定を教えて | 1692 | 499 | 311 | 71% | 82% | 38% |
-| Redisを使ったキャッシュ戦略を教えて | 2079 | 653 | 325 | 69% | 84% | 50% |
-| TypeScriptのジェネリクスを初心者向けに説明して | 1151 | 566 | 480 | 51% | 58% | 15% |
-| REST APIとGraphQLの違いを説明して | 783 | 366 | 276 | 53% | 65% | 25% |
-| Node.jsアプリのメモリリークを調査する方法を教えて | 1663 | 738 | 368 | 56% | 78% | 50% |
-| GitHub Actionsで基本的なCI/CDパイプライン | 2209 | 953 | 445 | 57% | 80% | 53% |
-| N+1クエリ問題とは何か、どう解決するか教えて | 1063 | 396 | 335 | 63% | 68% | 15% |
-| WebSocketとServer-Sent Eventsの使 | 1316 | 449 | 244 | 66% | 81% | 46% |
-| Reactの状態管理ライブラリの選び方を教えて | 993 | 408 | 254 | 59% | 74% | 38% |
-| Kubernetesの基本概念を説明して | 826 | 437 | 295 | 47% | 64% | 32% |
-| OAuth2の認証フローを説明して | 1387 | 451 | 252 | 67% | 82% | 44% |
-| CSS FlexboxとGridの使い分けを教えて | 1092 | 367 | 345 | 66% | 68% | 6% |
-| Pythonのデコレータの仕組みを説明して | 1703 | 527 | 279 | 69% | 84% | 47% |
-| データベースインデックスの仕組みと使いどころを教えて | 1305 | 489 | 305 | 63% | 77% | 38% |
-| JWTとセッションベース認証の比較を教えて | 814 | 404 | 269 | 50% | 67% | 33% |
-| Promise.allとPromise.raceの違いと使い | 1185 | 476 | 301 | 60% | 75% | 37% |
-| TerraformでAWSインフラを管理する基本を教えて | 1924 | 489 | 389 | 75% | 80% | 20% |
-| Node.jsのイベントループの仕組みを説明して | 1298 | 648 | 387 | 50% | 70% | 40% |
-| APIのレート制限を実装する方法を教えて | 2098 | 715 | 560 | 66% | 73% | 22% |
-| **平均** | **1438** | **480** | **300** | **67%** | **79%** | **37%** |
+| タスク | 通常 | 簡潔 | caveman | genshijin | genshijin削減 | gs vs 簡潔 | gs vs caveman |
+|--------|------|------|---------|-----------|---------------|-----------|---------------|
+| なぜReactコンポーネントが毎回再レンダリングされるのか説 | 1237 | 593 | 319 | 233 | 81% | 61% | 27% |
+| 認証ミドルウェアのトークン有効期限チェックにバグがある。修正 | 2086 | 985 | 332 | 195 | 91% | 80% | 41% |
+| Node.jsでPostgreSQLのコネクションプーリング | 2050 | 1389 | 854 | 397 | 81% | 71% | 54% |
+| git rebaseとmergeの違いを説明して | 705 | 434 | 312 | 237 | 66% | 45% | 24% |
+| コールバック地獄をasync/awaitにリファクタリングし | 1768 | 679 | 546 | 332 | 81% | 51% | 39% |
+| マイクロサービスとモノリスの比較を説明して | 1197 | 484 | 371 | 306 | 74% | 37% | 18% |
+| ExpressルートのPRをセキュリティ観点でレビューして | 1214 | 596 | 349 | 126 | 90% | 79% | 64% |
+| Dockerのマルチステージビルドを設定して | 1667 | 463 | 357 | 190 | 89% | 59% | 47% |
+| PostgreSQLのレースコンディションをデバッグして | 1790 | 1192 | 510 | 389 | 78% | 67% | 24% |
+| ReactのError Boundaryを実装して | 2791 | 1963 | 737 | 276 | 90% | 86% | 63% |
+| CORSエラーが出る。原因と解決策を教えて | 1105 | 494 | 387 | 284 | 74% | 43% | 27% |
+| Nginxのリバースプロキシ設定を教えて | 1790 | 750 | 408 | 320 | 82% | 57% | 22% |
+| Redisを使ったキャッシュ戦略を教えて | 2181 | 1085 | 688 | 354 | 84% | 67% | 49% |
+| TypeScriptのジェネリクスを初心者向けに説明して | 1240 | 763 | 573 | 444 | 64% | 42% | 23% |
+| REST APIとGraphQLの違いを説明して | 856 | 441 | 457 | 340 | 60% | 23% | 26% |
+| Node.jsアプリのメモリリークを調査する方法を教えて | 1794 | 1316 | 590 | 373 | 79% | 72% | 37% |
+| GitHub Actionsで基本的なCI/CDパイプライン | 2206 | 1274 | 674 | 601 | 73% | 53% | 11% |
+| N+1クエリ問題とは何か、どう解決するか教えて | 1033 | 562 | 391 | 351 | 66% | 38% | 10% |
+| WebSocketとServer-Sent Eventsの使 | 1159 | 475 | 489 | 179 | 85% | 62% | 63% |
+| Reactの状態管理ライブラリの選び方を教えて | 1185 | 493 | 398 | 333 | 72% | 32% | 16% |
+| Kubernetesの基本概念を説明して | 658 | 442 | 338 | 264 | 60% | 40% | 22% |
+| OAuth2の認証フローを説明して | 1495 | 520 | 520 | 290 | 81% | 44% | 44% |
+| CSS FlexboxとGridの使い分けを教えて | 1159 | 450 | 321 | 286 | 75% | 36% | 11% |
+| Pythonのデコレータの仕組みを説明して | 1370 | 584 | 517 | 342 | 75% | 41% | 34% |
+| データベースインデックスの仕組みと使いどころを教えて | 1410 | 504 | 550 | 335 | 76% | 34% | 39% |
+| JWTとセッションベース認証の比較を教えて | 1265 | 452 | 463 | 345 | 73% | 24% | 25% |
+| Promise.allとPromise.raceの違いと使い | 1207 | 573 | 450 | 326 | 73% | 43% | 28% |
+| TerraformでAWSインフラを管理する基本を教えて | 2284 | 822 | 724 | 458 | 80% | 44% | 37% |
+| Node.jsのイベントループの仕組みを説明して | 1438 | 455 | 706 | 343 | 76% | 25% | 51% |
+| APIのレート制限を実装する方法を教えて | 2006 | 1413 | 613 | 406 | 80% | 71% | 34% |
+| **平均** | **1511** | **754** | **498** | **321** | **79%** | **57%** | **35%** |
 <!-- BENCHMARK_END -->
 
 ### English Benchmark (参考値)
@@ -423,9 +423,9 @@ genshijin/
 
 <a href="https://www.star-history.com/?repos=InterfaceX-co-jp%2Fgenshijin&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=InterfaceX-co-jp/genshijin&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=InterfaceX-co-jp/genshijin&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=InterfaceX-co-jp/genshijin&type=date&legend=top-left" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=InterfaceX-co-jp/genshijin&type=date&theme=dark&legend=top-left&cb=v1.3.0" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=InterfaceX-co-jp/genshijin&type=date&legend=top-left&cb=v1.3.0" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=InterfaceX-co-jp/genshijin&type=date&legend=top-left&cb=v1.3.0" />
  </picture>
 </a>
 
