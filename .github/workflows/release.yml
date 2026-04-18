@@ -4,24 +4,42 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v1.2.0)'
+        required: true
+        type: string
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  release:
+  benchmark:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout main
         uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract version from tag
+      - name: Resolve tag
         id: version
         run: |
-          TAG="${GITHUB_REF#refs/tags/}"
+          if [ -n "${{ inputs.tag }}" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
           VERSION="${TAG#v}"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -36,22 +54,39 @@ jobs:
           fi
           echo "✅ plugin.json version == tag == $TAG_VERSION"
 
+      - name: Check existing benchmark result
+        id: check
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if [ -f "benchmarks/results/${TAG}_ja.json" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "✅ benchmarks/results/${TAG}_ja.json 既存 → ベンチスキップ"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Setup Python
+        if: steps.check.outputs.exists != 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - name: Install benchmark dependencies
+        if: steps.check.outputs.exists != 'true'
         run: pip install -r benchmarks/requirements.txt
 
       - name: Run benchmark (ja)
+        if: steps.check.outputs.exists != 'true'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
           cd benchmarks
-          python run.py --lang ja --trials 3 --tag ${{ steps.version.outputs.tag }} --update-readme --update-docs
+          python run.py --lang ja --trials 3 --tag "$TAG" --update-readme --update-docs
 
       - name: Bust star-history cache in README
+        if: steps.check.outputs.exists != 'true'
         env:
           TAG: ${{ steps.version.outputs.tag }}
         run: |
@@ -81,20 +116,63 @@ jobs:
               print("README.md: star-history URL 見つからず。スキップ")
           PY
 
-      - name: Commit benchmark results
+      - name: Commit benchmark results (先行push)
+        if: steps.check.outputs.exists != 'true'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add README.md docs/benchmark.json "benchmarks/results/${{ steps.version.outputs.tag }}_ja.json"
-          git diff --staged --quiet || git commit -m "ベンチマーク結果を更新 (${{ steps.version.outputs.tag }}) [skip benchmark]"
-          git pull --rebase
-          git push
+          git add README.md docs/benchmark.json "benchmarks/results/${TAG}_ja.json"
+          git diff --staged --quiet || git commit -m "ベンチマーク結果を更新 (${TAG}) [skip benchmark]"
+          git pull --rebase origin main
+          git push origin main
+
+      - name: Upload benchmark artifact (再実行保険)
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-${{ steps.version.outputs.tag }}
+          path: benchmarks/results/${{ steps.version.outputs.tag }}_ja.json
+          retention-days: 90
+          if-no-files-found: warn
+
+  release:
+    needs: benchmark
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main (post-bench)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Check if release exists
+        id: release-check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.benchmark.outputs.tag }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "✅ Release $TAG 既存 → スキップ"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download benchmark artifact (フォールバック)
+        if: steps.release-check.outputs.exists != 'true'
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: benchmark-${{ needs.benchmark.outputs.tag }}
+          path: benchmarks/results/
 
       - name: Build release notes
+        if: steps.release-check.outputs.exists != 'true'
         id: notes
         env:
-          TAG: ${{ steps.version.outputs.tag }}
-          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ needs.benchmark.outputs.tag }}
+          VERSION: ${{ needs.benchmark.outputs.version }}
         run: |
           python3 - <<'PY' > release-notes.md
           import json
@@ -143,9 +221,10 @@ jobs:
           cat release-notes.md
 
       - name: Create GitHub Release
+        if: steps.release-check.outputs.exists != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.version.outputs.tag }}
+          TAG: ${{ needs.benchmark.outputs.tag }}
         run: |
           ASSET=""
           if [ -f "benchmarks/results/${TAG}_ja.json" ]; then

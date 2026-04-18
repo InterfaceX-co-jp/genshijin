@@ -1,7 +1,7 @@
 node_modules/
 .DS_Store
 *.zip
-benchmarks/results/*.json
+benchmarks/results/benchmark_*.json
 __pycache__/
 .env
 .playwright-mcp/
