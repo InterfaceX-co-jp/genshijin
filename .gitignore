@@ -5,3 +5,6 @@ benchmarks/results/*.json
 __pycache__/
 .env
 .playwright-mcp/
+
+# Pages build artifact（CHANGELOG は pages.yml が artifact にコピーする）
+docs/CHANGELOG.md

@@ -5,6 +5,7 @@
 Claude Code / Codex 向けの超圧縮コミュニケーションスキル。[caveman](https://github.com/JuliusBrussee/caveman) の日本語版をベースに、日本語特有の冗長表現に最適化。
 
 トークン使用量を **約75%削減** しつつ、技術的正確性は100%維持。
+コミット生成・PRレビュー・メモリ圧縮の用途別サブスキルも同梱。
 
 ## 日本語への最適化ポイント
 
@@ -98,6 +99,30 @@ claude --plugin-dir ./path/to/genshijin
 
 **After:**
 > プール = DB接続再利用。ハンドシェイク省略 → 高負荷時に高速。
+
+## サブスキル
+
+本体 `/genshijin` に加え、用途別サブスキル4個同梱。
+
+| スキル | トリガー | 内容 |
+|--------|---------|------|
+| **genshijin-commit** | `/genshijin-commit` | Conventional Commits 形式の簡潔コミットメッセージ。件名≤50文字、「なぜ」重視 |
+| **genshijin-review** | `/genshijin-review` | 1行PRコメント `L42: 🔴 バグ: user null。ガード追加。` |
+| **genshijin-compress** | `/genshijin-compress <file>` | `CLAUDE.md` 等のメモリファイルを原始人モード化し入力トークン永続削減 |
+| **genshijin-help** | `/genshijin-help` | 全モード・サブスキル・設定方法のリファレンスカード |
+
+### genshijin-compress について
+
+`CLAUDE.md` はセッション開始毎に読み込まれる。圧縮すると **毎回** の入力トークンが減る。
+
+```bash
+/genshijin-compress CLAUDE.md
+```
+
+- 圧縮版が `CLAUDE.md` を上書き、人間可読版は `CLAUDE.original.md` にバックアップ
+- コードブロック・URL・ファイルパス・数値・見出しは完全保持
+- 機密ファイル（`.env`, `credentials.*`, `id_rsa`, `.ssh/` 配下等）は自動拒否
+- Python 3.10+ と `ANTHROPIC_API_KEY` または `claude` CLI が必要
 
 ## ベンチマーク
 
@@ -196,14 +221,24 @@ python run.py --lang en --trials 3 --update-readme     # 英語
 
 ```
 genshijin/
-├── skills/genshijin/SKILL.md   # コアのスキル定義
+├── skills/
+│   ├── genshijin/SKILL.md            # 本体スキル
+│   ├── genshijin-commit/SKILL.md     # コミット生成サブスキル
+│   ├── genshijin-review/SKILL.md     # PRレビューサブスキル
+│   ├── genshijin-help/SKILL.md       # ヘルプサブスキル
+│   └── genshijin-compress/
+│       ├── SKILL.md                  # メモリ圧縮サブスキル
+│       └── scripts/                  # Python CLI 実装
 ├── .claude-plugin/
-│   ├── plugin.json               # Claude Code プラグインマニフェスト
-│   └── marketplace.json          # マーケットプレイス定義
+│   ├── plugin.json                   # Claude Code プラグインマニフェスト
+│   └── marketplace.json              # マーケットプレイス定義
 ├── benchmarks/
-│   ├── run.py                    # ベンチマークスクリプト
-│   ├── prompts.json              # テスト用プロンプト（10問）
-│   └── requirements.txt          # Python依存パッケージ
+│   ├── run.py                        # ベンチマークスクリプト
+│   ├── prompts.json                  # テスト用プロンプト
+│   └── requirements.txt              # Python依存パッケージ
+├── docs/
+│   ├── index.html                    # GitHub Pages
+│   └── caveman-diff-analysis.md      # caveman差分分析 + 進捗管理
 ├── README.md
 ├── LICENSE
 └── .gitignore
