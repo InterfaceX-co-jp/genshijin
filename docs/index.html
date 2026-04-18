@@ -128,6 +128,10 @@
       color: var(--accent);
       display: block;
       user-select: all;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      white-space: nowrap;
+      padding-right: 72px;
     }
 
     .copy-btn {
@@ -267,6 +271,7 @@
       padding: 10px 12px;
       margin: 6px 0;
       overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
     }
 
     .example-card pre code {
@@ -317,6 +322,12 @@
     .mode-desc {
       color: var(--text-muted);
       font-size: 0.9rem;
+      min-width: 0;
+    }
+
+    .mode-desc pre {
+      -webkit-overflow-scrolling: touch;
+      max-width: 100%;
     }
 
     /* Features */
@@ -328,6 +339,45 @@
 
     @media (max-width: 600px) {
       .features { grid-template-columns: 1fr; }
+
+      .container { padding: 0 16px; }
+
+      .hero { padding: 48px 0 40px; }
+      .hero-icon { font-size: 56px; }
+      .hero h1 { font-size: 1.7rem; }
+      .hero h1 span { font-size: 1.2rem; }
+      .hero .tagline { font-size: 1rem; }
+
+      .stat-row { gap: 20px; margin-bottom: 32px; }
+      .stat-value { font-size: 1.7rem; }
+      .stat-label { font-size: 0.75rem; }
+
+      .install-box { padding: 16px; }
+      .install-box code { font-size: 0.8rem; }
+      .copy-btn { top: 12px; right: 12px; font-size: 0.75rem; padding: 5px 10px; }
+
+      section { margin-bottom: 40px; }
+      section h2 { font-size: 1.15rem; }
+
+      /* Mode カードを縦並びに。自動化機能・使い始めセクションの崩れ防止 */
+      .mode {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+        padding: 14px 16px;
+      }
+      .mode-name {
+        min-width: 0;
+        white-space: normal;
+      }
+      .mode-desc { font-size: 0.88rem; }
+      .mode-desc pre {
+        font-size: 0.7rem !important;
+      }
+
+      .changelog-entry { padding: 16px 18px; }
+      .changelog-header { flex-wrap: wrap; row-gap: 6px; }
+      .changelog-date { margin-left: 0; width: 100%; }
     }
 
     .feature {
@@ -380,6 +430,7 @@
     /* Table */
     .table-wrapper {
       overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
       border-radius: 10px;
       border: 1px solid var(--border);
     }
@@ -428,6 +479,7 @@
       padding: 20px;
       max-height: 600px;
       overflow: auto;
+      -webkit-overflow-scrolling: touch;
       font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
       font-size: 0.8rem;
       line-height: 1.6;
