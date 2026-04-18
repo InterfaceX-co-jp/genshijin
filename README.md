@@ -2,7 +2,11 @@
 
 > なぜ多くトークン使う？少なくて済む🗿
 
-[![Claude Code Plugin](https://img.shields.io/badge/Claude%20Code%20Plugin-%E5%85%AC%E9%96%8B%E6%B8%88-brightgreen)](https://claude.ai/settings/plugins)
+<p align="center">
+  <a href="https://github.com/InterfaceX-co-jp/genshijin/stargazers"><img src="https://img.shields.io/github/stars/InterfaceX-co-jp/genshijin?style=flat&color=yellow" alt="Stars"></a>
+  <a href="https://github.com/InterfaceX-co-jp/genshijin/commits/main"><img src="https://img.shields.io/github/last-commit/InterfaceX-co-jp/genshijin?style=flat" alt="Last Commit"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/InterfaceX-co-jp/genshijin?style=flat" alt="License"></a>
+</p>
 
 Claude Code 公式プラグインディレクトリに公開済み。`/plugin install genshijin` でワンライナーインストール。
 
