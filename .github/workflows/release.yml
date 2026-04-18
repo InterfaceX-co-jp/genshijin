@@ -51,6 +51,36 @@ jobs:
           cd benchmarks
           python run.py --lang ja --trials 3 --tag ${{ steps.version.outputs.tag }} --update-readme --update-docs
 
+      - name: Bust star-history cache in README
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          import pathlib
+
+          tag = os.environ["TAG"]
+          readme = pathlib.Path("README.md")
+          text = readme.read_text(encoding="utf-8")
+
+          def replace(match):
+              url = match.group(0)
+              url = re.sub(r"&cb=[^\"&\s]*", "", url)
+              return url + f"&cb={tag}"
+
+          new_text = re.sub(
+              r"https://api\.star-history\.com/chart\?[^\"\s]+",
+              replace,
+              text,
+          )
+          if new_text != text:
+              readme.write_text(new_text, encoding="utf-8")
+              print(f"README.md: star-history URL に cb={tag} を追加")
+          else:
+              print("README.md: star-history URL 見つからず。スキップ")
+          PY
+
       - name: Commit benchmark results
         run: |
           git config user.name "github-actions[bot]"
