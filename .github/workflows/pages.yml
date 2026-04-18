@@ -25,6 +25,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Pages
         uses: actions/configure-pages@v5
+      - name: Copy CHANGELOG into artifact
+        run: cp CHANGELOG.md docs/CHANGELOG.md
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:

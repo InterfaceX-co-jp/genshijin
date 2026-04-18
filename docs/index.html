@@ -442,6 +442,134 @@
     .json-viewer .json-bracket { color: #ccc; }
     .json-viewer .json-comma { color: #888; }
 
+    /* Patch Notes */
+    .changelog {
+      display: grid;
+      gap: 16px;
+    }
+
+    .changelog-entry {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 24px;
+    }
+
+    .changelog-entry.latest {
+      border-color: var(--accent-dim);
+      box-shadow: 0 0 0 1px var(--accent-dim) inset;
+    }
+
+    .changelog-header {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .changelog-version {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .changelog-entry.latest .changelog-badge {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--bg);
+      background: var(--accent-dim);
+      padding: 2px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .changelog-date {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-family: 'SF Mono', monospace;
+      margin-left: auto;
+    }
+
+    .changelog-section {
+      margin-top: 10px;
+    }
+
+    .changelog-section-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .changelog-section.added .changelog-section-title { color: #7ec87e; }
+    .changelog-section.changed .changelog-section-title { color: #7eb8e0; }
+    .changelog-section.fixed .changelog-section-title { color: #e0c060; }
+    .changelog-section.removed .changelog-section-title { color: var(--red); }
+    .changelog-section.deprecated .changelog-section-title { color: #b888d4; }
+    .changelog-section.security .changelog-section-title { color: var(--red); }
+
+    .changelog-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      font-size: 0.88rem;
+      line-height: 1.6;
+    }
+
+    .changelog-list li {
+      padding: 2px 0 2px 14px;
+      position: relative;
+      color: var(--text);
+    }
+
+    .changelog-list li::before {
+      content: '–';
+      position: absolute;
+      left: 0;
+      color: var(--text-muted);
+    }
+
+    .changelog-list li ul {
+      list-style: none;
+      padding-left: 16px;
+      margin-top: 2px;
+    }
+
+    .changelog-list code {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.82rem;
+      background: rgba(212, 165, 116, 0.15);
+      padding: 1px 5px;
+      border-radius: 3px;
+      color: var(--accent);
+    }
+
+    .changelog-more {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 8px;
+    }
+
+    .changelog-more a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .changelog-more a:hover { text-decoration: underline; }
+
+    .changelog-loading {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      padding: 16px 0;
+    }
+
     /* Footer */
     footer {
       text-align: center;
@@ -617,6 +745,16 @@
       <h2>ベンチマーク生データ (JSON)</h2>
       <p style="color: var(--text-muted); margin-bottom: 16px; font-size: 0.9rem;">30タスク × 3回試行の全結果。モデル: claude-sonnet-4-20250514</p>
       <div class="json-viewer" id="json-viewer">Loading...</div>
+    </section>
+
+    <section>
+      <h2>パッチノート</h2>
+      <p style="color: var(--text-muted); margin-bottom: 16px; font-size: 0.9rem;">
+        直近のリリース履歴。全履歴は <a href="https://github.com/InterfaceX-co-jp/genshijin/blob/main/CHANGELOG.md" style="color: var(--accent);">CHANGELOG.md</a> 参照。
+      </p>
+      <div id="changelog-container" class="changelog">
+        <div class="changelog-loading">パッチノートを読み込み中...</div>
+      </div>
     </section>
 
     <section>
@@ -804,6 +942,131 @@
         });
       }
     });
+
+    // ---------- Changelog ----------
+
+    const CHANGELOG_MAX_VERSIONS = 3;
+    const CHANGELOG_SOURCES = [
+      './CHANGELOG.md',
+      'https://raw.githubusercontent.com/InterfaceX-co-jp/genshijin/main/CHANGELOG.md'
+    ];
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[c]);
+    }
+
+    function renderInline(text) {
+      // Safe-by-default: HTML escape first, then re-enable backticks + markdown links only.
+      let out = escapeHtml(text);
+      out = out.replace(/`([^`]+)`/g, (_, c) => `<code>${c}</code>`);
+      out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, t, u) => `<a href="${u}">${t}</a>`);
+      return out;
+    }
+
+    function parseChangelog(md) {
+      // Entries = "## [x.y.z] - YYYY-MM-DD" (Unreleased は無視)
+      const versionRe = /^## \[(\d+\.\d+\.\d+)\]\s*-\s*(\S+)\s*$/;
+      const sectionRe = /^### (\w+)\s*$/;
+      const lines = md.split('\n');
+      const entries = [];
+      let cur = null, curSection = null;
+      const flushSection = () => { if (cur && curSection) { cur.sections.push(curSection); curSection = null; } };
+      const flushEntry = () => { flushSection(); if (cur) entries.push(cur); cur = null; };
+
+      for (const line of lines) {
+        const vm = line.match(versionRe);
+        if (vm) {
+          flushEntry();
+          cur = { version: vm[1], date: vm[2], sections: [] };
+          continue;
+        }
+        if (!cur) continue;
+        const sm = line.match(sectionRe);
+        if (sm) {
+          flushSection();
+          curSection = { name: sm[1], items: [] };
+          continue;
+        }
+        if (!curSection) continue;
+        // トップレベル箇条書き: "- ..." (インデントなし)
+        const topBullet = line.match(/^- (.+)$/);
+        if (topBullet) {
+          curSection.items.push({ text: topBullet[1], children: [] });
+          continue;
+        }
+        // 2スペースインデント箇条書き: "  - ..."
+        const subBullet = line.match(/^  - (.+)$/);
+        if (subBullet && curSection.items.length > 0) {
+          curSection.items[curSection.items.length - 1].children.push(subBullet[1]);
+        }
+      }
+      flushEntry();
+      return entries;
+    }
+
+    function renderChangelog(entries) {
+      const container = document.getElementById('changelog-container');
+      if (!container) return;
+      if (entries.length === 0) {
+        container.innerHTML = '<div class="changelog-loading">パッチノートがありません。</div>';
+        return;
+      }
+      const top = entries.slice(0, CHANGELOG_MAX_VERSIONS);
+      const html = top.map((entry, idx) => {
+        const isLatest = idx === 0;
+        const badge = isLatest ? '<span class="changelog-badge">LATEST</span>' : '';
+        const sectionsHtml = entry.sections.map(sec => {
+          const itemsHtml = sec.items.map(item => {
+            const sub = item.children.length > 0
+              ? `<ul>${item.children.map(c => `<li>${renderInline(c)}</li>`).join('')}</ul>`
+              : '';
+            return `<li>${renderInline(item.text)}${sub}</li>`;
+          }).join('');
+          return `
+            <div class="changelog-section ${sec.name.toLowerCase()}">
+              <div class="changelog-section-title">${escapeHtml(sec.name)}</div>
+              <ul class="changelog-list">${itemsHtml}</ul>
+            </div>
+          `;
+        }).join('');
+        return `
+          <div class="changelog-entry${isLatest ? ' latest' : ''}">
+            <div class="changelog-header">
+              <span class="changelog-version">v${escapeHtml(entry.version)}</span>
+              ${badge}
+              <span class="changelog-date">${escapeHtml(entry.date)}</span>
+            </div>
+            ${sectionsHtml}
+          </div>
+        `;
+      }).join('');
+      const moreLink = entries.length > CHANGELOG_MAX_VERSIONS
+        ? `<div class="changelog-more">古い履歴: <a href="https://github.com/InterfaceX-co-jp/genshijin/blob/main/CHANGELOG.md">CHANGELOG.md</a></div>`
+        : '';
+      container.innerHTML = html + moreLink;
+    }
+
+    async function loadChangelog() {
+      for (const url of CHANGELOG_SOURCES) {
+        try {
+          const res = await fetch(url, { cache: 'no-cache' });
+          if (!res.ok) continue;
+          const md = await res.text();
+          renderChangelog(parseChangelog(md));
+          return;
+        } catch (e) {
+          // 次のソースを試す
+        }
+      }
+      const container = document.getElementById('changelog-container');
+      if (container) {
+        container.innerHTML = '<div class="changelog-loading">パッチノートを読み込めませんでした。<a href="https://github.com/InterfaceX-co-jp/genshijin/blob/main/CHANGELOG.md" style="color: var(--accent);">GitHub で確認</a></div>';
+      }
+    }
+
+    loadChangelog();
   </script>
 </body>
 </html>
