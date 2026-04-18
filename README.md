@@ -142,7 +142,39 @@ claude --plugin-dir ./path/to/genshijin
 genshijin は日本語最適化スキルだが、英語プロンプトでも圧縮効果を発揮するか検証。caveman（英語ネイティブ）との比較。
 
 <!-- BENCHMARK_EN_START -->
-*英語ベンチマーク未実行。`python run.py --lang en --trials 3 --update-readme` で生成。*
+| Task | Normal | caveman | genshijin | caveman saved | genshijin saved | genshijin vs caveman |
+|------|--------|---------|-----------|--------------|----------------|---------------------|
+| Why does my React component re | 1318 | 275 | 112 | 79% | 92% | 59% |
+| There's a bug in the auth midd | 877 | 84 | 41 | 90% | 95% | 51% |
+| How do I set up PostgreSQL con | 2371 | 298 | 282 | 87% | 88% | 5% |
+| Explain the difference between | 516 | 245 | 233 | 53% | 55% | 5% |
+| Refactor callback hell to asyn | 2093 | 364 | 270 | 83% | 87% | 26% |
+| Compare microservices vs monol | 853 | 331 | 314 | 61% | 63% | 5% |
+| Review this Express route PR f | 190 | 47 | 48 | 75% | 75% | -2% |
+| Set up Docker multi-stage buil | 2105 | 341 | 311 | 84% | 85% | 9% |
+| Debug a race condition in Post | 2113 | 365 | 248 | 83% | 88% | 32% |
+| Implement a React Error Bounda | 3196 | 400 | 253 | 87% | 92% | 37% |
+| I'm getting CORS errors. What' | 1382 | 260 | 258 | 81% | 81% | 1% |
+| Show me how to configure Nginx | 3151 | 462 | 300 | 85% | 90% | 35% |
+| What's a good Redis caching st | 1538 | 270 | 255 | 82% | 83% | 6% |
+| Explain TypeScript generics fo | 1621 | 632 | 384 | 61% | 76% | 39% |
+| Explain the difference between | 614 | 266 | 209 | 57% | 66% | 21% |
+| How do I investigate memory le | 2099 | 473 | 337 | 77% | 84% | 29% |
+| Build a basic CI/CD pipeline w | 3168 | 537 | 385 | 83% | 88% | 28% |
+| What is the N+1 query problem  | 1080 | 328 | 337 | 70% | 69% | -3% |
+| When should I use WebSocket vs | 646 | 189 | 215 | 71% | 67% | -14% |
+| How do I choose a React state  | 1057 | 232 | 185 | 78% | 82% | 20% |
+| Explain the basic concepts of  | 855 | 346 | 296 | 60% | 65% | 14% |
+| Explain the OAuth2 authenticat | 1594 | 426 | 321 | 73% | 80% | 25% |
+| When should I use CSS Flexbox  | 575 | 234 | 213 | 59% | 63% | 9% |
+| Explain how Python decorators  | 1588 | 357 | 368 | 78% | 77% | -3% |
+| Explain how database indexes w | 1624 | 346 | 295 | 79% | 82% | 15% |
+| Compare JWT vs session-based a | 1068 | 257 | 260 | 76% | 76% | -1% |
+| Explain the difference between | 729 | 170 | 229 | 77% | 69% | -35% |
+| How do I manage AWS infrastruc | 2603 | 571 | 373 | 78% | 86% | 35% |
+| Explain how the Node.js event  | 1406 | 404 | 319 | 71% | 77% | 21% |
+| How do I implement API rate li | 2147 | 320 | 286 | 85% | 87% | 11% |
+| **Average** | **1539** | **327** | **264** | **79%** | **83%** | **19%** |
 <!-- BENCHMARK_EN_END -->
 
 > ベンチマークは英語版 [caveman](https://github.com/JuliusBrussee/caveman) の結果を参考値として掲載。
