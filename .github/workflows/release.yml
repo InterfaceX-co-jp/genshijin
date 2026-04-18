@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Verify plugin.json version matches tag
+        run: |
+          MANIFEST_VERSION=$(python3 -c "import json; print(json.load(open('.claude-plugin/plugin.json'))['version'])")
+          TAG_VERSION="${{ steps.version.outputs.version }}"
+          if [ "$MANIFEST_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::plugin.json version ($MANIFEST_VERSION) はタグ ($TAG_VERSION) と不一致。リリース中止。"
+            exit 1
+          fi
+          echo "✅ plugin.json version == tag == $TAG_VERSION"
+
+      - name: Extract CHANGELOG section
+        id: changelog
+        run: |
+          python3 - <<'PY' > release-notes.md
+          import re, pathlib, sys
+          version = "${{ steps.version.outputs.version }}"
+          text = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8")
+          pattern = rf"^## \[{re.escape(version)}\][^\n]*\n(.*?)(?=^## \[|\Z)"
+          m = re.search(pattern, text, flags=re.DOTALL | re.MULTILINE)
+          if not m:
+              sys.stderr.write(f"CHANGELOG.md に [{version}] セクションが見つからない。\n")
+              sys.exit(1)
+          sys.stdout.write(m.group(1).strip() + "\n")
+          PY
+          echo '--- release-notes.md ---'
+          cat release-notes.md
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --title "${{ steps.version.outputs.tag }}" \
+            --notes-file release-notes.md \
+            --verify-tag
