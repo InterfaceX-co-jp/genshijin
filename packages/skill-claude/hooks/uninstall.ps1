@@ -1,5 +1,5 @@
 # genshijin — SessionStart + UserPromptSubmit フック アンインストーラ (Windows)
-# 使い方: powershell -ExecutionPolicy Bypass -File hooks\uninstall.ps1
+# 使い方: powershell -ExecutionPolicy Bypass -File packages\skill-claude\hooks\uninstall.ps1
 
 $ErrorActionPreference = "Stop"
 

@@ -1,7 +1,13 @@
 {
   "name": "genshijin",
+  "version": "2.0.0-alpha.0",
   "private": true,
+  "description": "超圧縮コミュニケーションモード monorepo (v2.0.0+)",
   "scripts": {
     "dev": "npx serve docs"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=18"
   }
 }

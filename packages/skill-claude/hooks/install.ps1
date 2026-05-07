@@ -1,9 +1,9 @@
 # genshijin — Claude Code フック ワンコマンドインストーラ (Windows PowerShell)
 # 導入: SessionStart フック（ルール自動読込） + UserPromptSubmit フック（モード追跡）
-# 使い方: powershell -ExecutionPolicy Bypass -File hooks\install.ps1
-#   or:  powershell -ExecutionPolicy Bypass -File hooks\install.ps1 -Force
+# 使い方: powershell -ExecutionPolicy Bypass -File packages\skill-claude\hooks\install.ps1
+#   or:  powershell -ExecutionPolicy Bypass -File packages\skill-claude\hooks\install.ps1 -Force
 #   or (リモート、-Force パイプ経由不可):
-#        irm https://raw.githubusercontent.com/InterfaceX-co-jp/genshijin/main/hooks/install.ps1 | iex
+#        irm https://raw.githubusercontent.com/InterfaceX-co-jp/genshijin/main/packages/skill-claude/hooks/install.ps1 | iex
 param(
     [switch]$Force
 )
@@ -20,7 +20,7 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
 $ClaudeDir = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $env:USERPROFILE ".claude" }
 $HooksDir = Join-Path $ClaudeDir "hooks"
 $Settings = Join-Path $ClaudeDir "settings.json"
-$RepoUrl = "https://raw.githubusercontent.com/InterfaceX-co-jp/genshijin/main/hooks"
+$RepoUrl = "https://raw.githubusercontent.com/InterfaceX-co-jp/genshijin/main/packages/skill-claude/hooks"
 
 $HookFiles = @("package.json", "genshijin-config.js", "genshijin-activate.js", "genshijin-mode-tracker.js", "genshijin-stats.js", "genshijin-statusline.sh", "genshijin-statusline.ps1")
 
@@ -67,7 +67,7 @@ if (-not $Force) {
 
     if ($AllFilesPresent -and $HooksWired -and $HasStatusLine) {
         Write-Host "genshijin フック 既にインストール済: $HooksDir"
-        Write-Host "  強制再インストール: powershell -File hooks\install.ps1 -Force"
+        Write-Host "  強制再インストール: powershell -File packages\skill-claude\hooks\install.ps1 -Force"
         Write-Host ""
         Write-Host "既に配置済。何もしません。"
         exit 0

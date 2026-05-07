@@ -1,0 +1,9 @@
+{
+  "name": "@genshijin/skill-claude",
+  "version": "1.4.0",
+  "private": true,
+  "description": "Claude Code plugin for genshijin (skills + hooks + commands + agents).",
+  "license": "MIT",
+  "repository": "https://github.com/InterfaceX-co-jp/genshijin",
+  "homepage": "https://interfacex-co-jp.github.io/genshijin/"
+}

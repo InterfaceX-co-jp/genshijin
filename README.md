@@ -62,7 +62,7 @@ npx skills add InterfaceX-co-jp/genshijin
 # リポジトリのルートで実行
 mkdir -p .claude/skills/genshijin
 curl -o .claude/skills/genshijin/SKILL.md \
-  https://raw.githubusercontent.com/InterfaceX-co-jp/genshijin/main/skills/genshijin/SKILL.md
+  https://raw.githubusercontent.com/InterfaceX-co-jp/genshijin/main/packages/skill-claude/skills/genshijin/SKILL.md
 ```
 
 **グローバル**（すべてのプロジェクトに適用）:
@@ -70,7 +70,7 @@ curl -o .claude/skills/genshijin/SKILL.md \
 ```bash
 mkdir -p ~/.claude/skills/genshijin
 curl -o ~/.claude/skills/genshijin/SKILL.md \
-  https://raw.githubusercontent.com/InterfaceX-co-jp/genshijin/main/skills/genshijin/SKILL.md
+  https://raw.githubusercontent.com/InterfaceX-co-jp/genshijin/main/packages/skill-claude/skills/genshijin/SKILL.md
 ```
 
 ### 方法4: 一時的に使う
@@ -219,7 +219,7 @@ JSON
 - `/genshijin-review` — 現在のコード変更を1行1指摘でレビュー（`L42: 🔴 バグ: ...`）
 - `/genshijin-stats` (v1.4.0〜) — 現セッションのリアルトークン使用量＋推定削減量＋USD換算をフックが即時表示。`--share` ツイート用1行サマリ、`--all` / `--since 7d` ライフタイム集計対応
 
-定義は [commands/](./commands/) 配下。
+定義は [packages/skill-claude/commands/](./packages/skill-claude/commands/) 配下。
 
 ## v1.4.0 拡張機能
 
@@ -276,7 +276,7 @@ Cursor / Windsurf / Cline / Copilot / AGENTS.md 用 rule file 生成。`--dry-ru
 | `genshijin-builder` | 1-2ファイル surgical edit。3+ファイルは `too-big.` で拒否 |
 | `genshijin-reviewer` | severity-tagged finding (🔴bug / 🟡risk / 🔵nit / ❓question) |
 
-委譲判断ガイドは [skills/genshijin-crew/SKILL.md](./skills/genshijin-crew/SKILL.md)。
+委譲判断ガイドは [packages/skill-claude/skills/genshijin-crew/SKILL.md](./packages/skill-claude/skills/genshijin-crew/SKILL.md)。
 
 ## マルチエージェント対応（v1.3.0〜）
 
@@ -297,16 +297,16 @@ Claude Code 以外の AI コーディングエージェントでも原始人モ�
 
 ```bash
 # インストール
-bash hooks/install.sh
+bash packages/skill-claude/hooks/install.sh
 
 # 再インストール
-bash hooks/install.sh --force
+bash packages/skill-claude/hooks/install.sh --force
 
 # アンインストール
-bash hooks/uninstall.sh
+bash packages/skill-claude/hooks/uninstall.sh
 ```
 
-Windows は `hooks/install.ps1` / `hooks/uninstall.ps1`。`settings.json` への安全マージ（既存 statusline を尊重）。
+Windows は `packages/skill-claude/hooks/install.ps1` / `packages/skill-claude/hooks/uninstall.ps1`。`settings.json` への安全マージ（既存 statusline を尊重）。
 
 ## アップデート
 
@@ -327,7 +327,7 @@ Claude Code 内の `/plugin update genshijin` が使える環境ではそれで�
 ```bash
 cd /path/to/genshijin
 git pull
-bash hooks/install.sh --force   # Windows: hooks/install.ps1 -Force
+bash packages/skill-claude/hooks/install.sh --force   # Windows: packages/skill-claude/hooks/install.ps1 -Force
 ```
 
 ### npx skills 版
@@ -431,45 +431,62 @@ python run.py --lang en --trials 3 --update-readme     # 英語
 
 ## プロジェクト構成
 
+v2.0.0 以降は monorepo (pnpm workspaces) 化。Claude Code skill は `packages/skill-claude/` 配下に集約。
+
 ```
 genshijin/
-├── skills/
-│   ├── genshijin/SKILL.md            # 本体スキル
-│   ├── genshijin-commit/SKILL.md     # コミット生成サブスキル
-│   ├── genshijin-review/SKILL.md     # PRレビューサブスキル
-│   ├── genshijin-help/SKILL.md       # ヘルプサブスキル
-│   └── genshijin-compress/
-│       ├── SKILL.md                  # メモリ圧縮サブスキル
-│       └── scripts/                  # Python CLI 実装
-├── hooks/                            # v1.2.0〜
-│   ├── genshijin-activate.js         # SessionStart: ルール注入
-│   ├── genshijin-mode-tracker.js     # UserPromptSubmit: モード追跡 + 毎ターン補強
-│   ├── genshijin-config.js           # 設定解決（env var + config file）
-│   ├── genshijin-statusline.sh       # statusline バッジ（Unix）
-│   ├── genshijin-statusline.ps1      # statusline バッジ（Windows）
-│   ├── install.sh / uninstall.sh     # standalone インストーラ（v1.3.0〜）
-│   └── install.ps1 / uninstall.ps1   # standalone インストーラ Windows
-├── commands/                         # v1.3.0〜スラッシュコマンド定義
-│   ├── genshijin.toml                # /genshijin 強度切替
-│   ├── genshijin-commit.toml         # /genshijin-commit
-│   └── genshijin-review.toml         # /genshijin-review
-├── rules/                            # v1.3.0〜
-│   └── genshijin-activate.md         # フック無しプラットフォーム向け共通ルール
-├── .cursor/rules/                    # Cursor 用（v1.3.0〜）
-├── .windsurf/rules/                  # Windsurf 用（v1.3.0〜）
-├── .clinerules/                      # Cline 用（v1.3.0〜）
-├── .github/copilot-instructions.md   # GitHub Copilot 用（v1.3.0〜）
-├── AGENTS.md                         # マルチエージェント参照インデックス（v1.3.0〜）
+├── packages/
+│   └── skill-claude/                       # Claude Code plugin (本体)
+│       ├── .claude-plugin/
+│       │   └── plugin.json                 # plugin マニフェスト（hooks 登録）
+│       ├── skills/
+│       │   ├── genshijin/SKILL.md          # 本体スキル
+│       │   ├── genshijin-commit/SKILL.md   # コミット生成サブスキル
+│       │   ├── genshijin-review/SKILL.md   # PRレビューサブスキル
+│       │   ├── genshijin-help/SKILL.md     # ヘルプサブスキル
+│       │   ├── genshijin-stats/SKILL.md    # 統計表示サブスキル
+│       │   ├── genshijin-crew/SKILL.md     # 委譲ガイド
+│       │   └── genshijin-compress/
+│       │       ├── SKILL.md                # メモリ圧縮サブスキル
+│       │       └── scripts/                # Python CLI 実装
+│       ├── hooks/                          # SessionStart / UserPromptSubmit + statusline
+│       │   ├── genshijin-activate.js
+│       │   ├── genshijin-mode-tracker.js
+│       │   ├── genshijin-config.js
+│       │   ├── genshijin-stats.js
+│       │   ├── genshijin-statusline.sh
+│       │   ├── genshijin-statusline.ps1
+│       │   ├── install.sh / uninstall.sh
+│       │   └── install.ps1 / uninstall.ps1
+│       ├── commands/                       # スラッシュコマンド定義
+│       │   ├── genshijin.toml
+│       │   ├── genshijin-commit.toml
+│       │   ├── genshijin-review.toml
+│       │   └── genshijin-stats.toml
+│       └── agents/                         # subagent preset
+│           ├── genshijin-investigator.md
+│           ├── genshijin-builder.md
+│           └── genshijin-reviewer.md
+├── rules/                                  # フック無しプラットフォーム向け共通ルール
+│   └── genshijin-activate.md
+├── tools/                                  # マルチエージェント installer 補助
+│   └── genshijin-init.js
+├── mcp-servers/                            # MCP middleware
+│   └── genshijin-shrink/
 ├── .claude-plugin/
-│   ├── plugin.json                   # Claude Code プラグインマニフェスト（hooks 登録）
-│   └── marketplace.json              # マーケットプレイス定義
+│   └── marketplace.json                    # マーケットプレイス定義（pluginRoot: ./packages）
 ├── benchmarks/
-│   ├── run.py                        # ベンチマークスクリプト
-│   ├── prompts.json                  # テスト用プロンプト
-│   └── requirements.txt              # Python依存パッケージ
+│   ├── run.py
+│   ├── prompts.json
+│   └── requirements.txt
 ├── docs/
-│   ├── index.html                    # GitHub Pages
-│   └── caveman-diff-analysis.md      # caveman差分分析 + 進捗管理
+│   ├── index.html                          # GitHub Pages
+│   ├── caveman-diff-analysis.md            # caveman差分分析
+│   ├── v2-monorepo-migration-plan.md       # v2.0.0 移行計画
+│   └── v2-progress.md                      # v2.0.0 進捗
+├── install.sh / install.ps1                # smart multi-agent installer (root)
+├── pnpm-workspace.yaml
+├── package.json
 ├── README.md
 ├── LICENSE
 └── .gitignore
