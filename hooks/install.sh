@@ -35,7 +35,7 @@ HOOKS_DIR="$CLAUDE_DIR/hooks"
 SETTINGS="$CLAUDE_DIR/settings.json"
 REPO_URL="https://raw.githubusercontent.com/InterfaceX-co-jp/genshijin/main/hooks"
 
-HOOK_FILES=("package.json" "genshijin-config.js" "genshijin-activate.js" "genshijin-mode-tracker.js" "genshijin-statusline.sh")
+HOOK_FILES=("package.json" "genshijin-config.js" "genshijin-activate.js" "genshijin-mode-tracker.js" "genshijin-stats.js" "genshijin-statusline.sh")
 
 # ソース解決 — repo clone でも curl パイプでも動作
 SCRIPT_DIR=""

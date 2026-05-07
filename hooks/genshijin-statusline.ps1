@@ -46,3 +46,17 @@ if ([string]::IsNullOrEmpty($Label)) {
 } else {
     [Console]::Write("${Esc}[38;5;172m[原始人:$Label]${Esc}[0m")
 }
+
+# /genshijin-stats が書出した savings suffix (存在時のみ)
+$SuffixPath = Join-Path $ClaudeDir ".genshijin-statusline-suffix"
+if (Test-Path $SuffixPath) {
+    try {
+        $SuffixItem = Get-Item -LiteralPath $SuffixPath -Force -ErrorAction Stop
+        if (-not ($SuffixItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -and $SuffixItem.Length -le 32) {
+            $Suffix = (Get-Content -LiteralPath $SuffixPath -Raw -ErrorAction Stop).Trim()
+            if ($Suffix) {
+                [Console]::Write(" ${Esc}[38;5;108m$Suffix${Esc}[0m")
+            }
+        }
+    } catch {}
+}

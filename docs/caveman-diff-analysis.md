@@ -216,6 +216,57 @@ description: >
 
 - [ ] 12. 文言文相当の日本語超圧縮モード（漢文訓読風 or 漢字のみ）
 
+### P4 — 本家 v1.3.0以降 (2026-04-30〜05-01) 差分
+
+caveman 本家 commits `56875e8` / `83ec61c` / `e031c1e` で大規模拡張: stats receipts / smart installer / cavecrew / cavepack / MCP-shrink。本家59テスト合格。genshijin v1.4.0 で全項目移植。
+
+- [x] 13. `genshijin-stats` — リアルセッショントークン使用量 + 削減見積もり（2026-05-07 完了）
+  - `/genshijin-stats` 起動。フックが `decision: "block"` で即時表示
+  - per-million 価格 USD 換算、`--share` ツイート可能ライン、`--all` / `--since N[d|h]` ライフタイム集計
+  - `*.original.md` 検出で input側削減 (memory compress) も計測
+  - statusline savings suffix `.genshijin-statusline-suffix`
+  - [hooks/genshijin-stats.js](../hooks/genshijin-stats.js) · [skills/genshijin-stats/SKILL.md](../skills/genshijin-stats/SKILL.md)
+
+- [x] 14. ultra-mode code-symbol guard — SKILL.md 極限モード強化（2026-05-07 完了）
+  - コードシンボル/関数名/API名/エラー文字列は略称化禁止を明示
+  - 自動解除条件拡張: 多段手順での fragment順誤読リスク、圧縮自体が技術的曖昧性発生時
+  - [skills/genshijin/SKILL.md](../skills/genshijin/SKILL.md)
+
+- [x] 15. compress fixes — `genshijin-compress` 品質向上（2026-05-07 完了）
+  - UTF-8 stdout 強制、空入力 / 同一出力ガード、frontmatter cleanup
+  - [skills/genshijin-compress/scripts/compress.py](../skills/genshijin-compress/scripts/compress.py)
+
+- [x] 16. cavecrew相当 — `genshijin-crew` 3サブエージェント（2026-05-07 完了）
+  - `genshijin-investigator` (read-only locator)、`genshijin-builder` (1-2ファイル surgical edit)、`genshijin-reviewer` (severity-tagged finding)
+  - subagent tool-result が原始人圧縮で約60%縮小 → 主コンテキスト持続
+  - [agents/genshijin-investigator.md](../agents/genshijin-investigator.md) · [agents/genshijin-builder.md](../agents/genshijin-builder.md) · [agents/genshijin-reviewer.md](../agents/genshijin-reviewer.md) · [skills/genshijin-crew/SKILL.md](../skills/genshijin-crew/SKILL.md)
+
+- [x] 17. `genshijin-shrink` MCP middleware proxy（2026-05-07 完了）
+  - 任意の MCP サーバー wrap → `tools/list` `description` を圧縮
+  - コード/URL/パス/識別子は byte-for-byte 保護
+  - npm publishable: `npx genshijin-shrink <upstream> [args]`
+  - [mcp-servers/genshijin-shrink/](../mcp-servers/genshijin-shrink/)
+
+- [x] 18. `tools/genshijin-init.js` — マルチエージェント rules 一発投下（2026-05-07 完了）
+  - Cursor/Windsurf/Cline/Copilot/AGENTS.md に rule 投下
+  - sentinel チェック idempotent、`--dry-run` / `--force` / `--only <agent>`
+  - [tools/genshijin-init.js](../tools/genshijin-init.js)
+
+- [x] 19. root `install.sh` / `install.ps1` — smart multi-agent installer（2026-05-07 完了）
+  - Claude Code/Gemini/Codex/Cursor/Windsurf/Cline 検出 → native install
+  - `--dry-run` / `--force` / `--only` / `--all` / `--minimal` / `--list`
+  - 既存 `hooks/install.sh` は Claude Code 単独用として残す
+  - [install.sh](../install.sh) · [install.ps1](../install.ps1)
+
+- [x] 20. Windows PowerShell tempfile fix（2026-05-07 完了）
+  - `node -e "..."` 引用符エスケープ問題回避
+  - [hooks/install.ps1](../hooks/install.ps1)
+
+- [x] 21. `/genshijin` 引数ホワイトリスト + symlinked-parent `~/.claude` 対応（2026-05-07 完了）
+  - 不正引数で flag file silent overwrite 防止
+  - `~/.claude` が symlink の場合の immediate parent チェック
+  - [hooks/genshijin-mode-tracker.js](../hooks/genshijin-mode-tracker.js) · [hooks/genshijin-config.js](../hooks/genshijin-config.js)
+
 ### 更新ルール
 
 - 着手時: `[ ]` → `[~]`、コミットハッシュ・PR番号・メモを項目末尾に追記

@@ -22,7 +22,7 @@ $HooksDir = Join-Path $ClaudeDir "hooks"
 $Settings = Join-Path $ClaudeDir "settings.json"
 $RepoUrl = "https://raw.githubusercontent.com/InterfaceX-co-jp/genshijin/main/hooks"
 
-$HookFiles = @("package.json", "genshijin-config.js", "genshijin-activate.js", "genshijin-mode-tracker.js", "genshijin-statusline.sh", "genshijin-statusline.ps1")
+$HookFiles = @("package.json", "genshijin-config.js", "genshijin-activate.js", "genshijin-mode-tracker.js", "genshijin-stats.js", "genshijin-statusline.sh", "genshijin-statusline.ps1")
 
 $ScriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { $null }
 
@@ -171,7 +171,15 @@ fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
 console.log('  settings.json に hooks 登録完了。');
 '@
 
-node -e $nodeScript
+# Windows PowerShell + cmd.exe で `node -e "..."` の引用符エスケープが壊れる問題回避:
+# temp file に書出し node <file> で実行。実行後 temp file は finally で削除。
+$tempScript = [System.IO.Path]::GetTempFileName() + ".js"
+try {
+    Set-Content -Path $tempScript -Value $nodeScript -Encoding UTF8
+    & node $tempScript
+} finally {
+    Remove-Item $tempScript -Force -ErrorAction SilentlyContinue
+}
 
 Write-Host ""
 Write-Host "完了。Claude Code 再起動で有効化。" -ForegroundColor Green

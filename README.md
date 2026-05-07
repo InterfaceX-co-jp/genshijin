@@ -120,13 +120,15 @@ claude --plugin-dir ./path/to/genshijin
 
 ## サブスキル
 
-本体 `/genshijin` に加え、用途別サブスキル4個同梱。
+本体 `/genshijin` に加え、用途別サブスキル6個同梱。
 
 | スキル | トリガー | 内容 |
 |--------|---------|------|
 | **genshijin-commit** | `/genshijin-commit` | Conventional Commits 形式の簡潔コミットメッセージ。件名≤50文字、「なぜ」重視 |
 | **genshijin-review** | `/genshijin-review` | 1行PRコメント `L42: 🔴 バグ: user null。ガード追加。` |
 | **genshijin-compress** | `/genshijin-compress <file>` | `CLAUDE.md` 等のメモリファイルを原始人モード化し入力トークン永続削減 |
+| **genshijin-stats** (v1.4.0〜) | `/genshijin-stats [--share / --all / --since 7d]` | 現セッションのリアルトークン使用量＋推定削減量＋USD換算をフックが即時表示 |
+| **genshijin-crew** (v1.4.0〜) | (auto) | 3 subagent preset (`investigator`/`builder`/`reviewer`)。tool-result 原始人圧縮で主コンテキスト約60%減 |
 | **genshijin-help** | `/genshijin-help` | 全モード・サブスキル・設定方法のリファレンスカード |
 
 ### genshijin-compress について
@@ -215,8 +217,66 @@ JSON
 - `/genshijin 丁寧|通常|極限` — 強度レベル切替
 - `/genshijin-commit` — 現在のステージング変更から簡潔なコミットメッセージ生成（Conventional Commits）
 - `/genshijin-review` — 現在のコード変更を1行1指摘でレビュー（`L42: 🔴 バグ: ...`）
+- `/genshijin-stats` (v1.4.0〜) — 現セッションのリアルトークン使用量＋推定削減量＋USD換算をフックが即時表示。`--share` ツイート用1行サマリ、`--all` / `--since 7d` ライフタイム集計対応
 
 定義は [commands/](./commands/) 配下。
+
+## v1.4.0 拡張機能
+
+caveman 本家 v1.3.0以降の差分（stats receipts / smart installer / cavecrew相当 / cavepack相当 / MCP-shrink）を全項目移植。
+
+### Smart multi-agent installer — root `install.sh` / `install.ps1`
+
+Claude Code/Cursor/Windsurf/Cline/Copilot を自動検出し、各 agent に native install。
+
+```bash
+# macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/InterfaceX-co-jp/genshijin/main/install.sh | bash
+
+# Windows PowerShell
+iwr -useb https://raw.githubusercontent.com/InterfaceX-co-jp/genshijin/main/install.ps1 | iex
+```
+
+`--dry-run` / `--force` / `--only <agent>` / `--all` / `--minimal` / `--list` 対応。再実行安全。
+
+### genshijin-init — per-repo rule 一発投下
+
+1コマンドで対象 repo に常時有効化 rule を全 IDE agent 用に投下。idempotent。
+
+```bash
+npx -y https://raw.githubusercontent.com/InterfaceX-co-jp/genshijin/main/tools/genshijin-init.js
+```
+
+Cursor / Windsurf / Cline / Copilot / AGENTS.md 用 rule file 生成。`--dry-run` / `--force` / `--only` 対応。
+
+### genshijin-shrink — MCP middleware
+
+任意の MCP server を wrap → `tools/list` の `description` field を圧縮。コード/URL/パス/識別子は byte-for-byte 保護。
+
+```jsonc
+{
+  "mcpServers": {
+    "fs-shrunk": {
+      "command": "npx",
+      "args": ["genshijin-shrink", "npx", "@modelcontextprotocol/server-filesystem", "/path"]
+    }
+  }
+}
+```
+
+詳細は [mcp-servers/genshijin-shrink/README.md](./mcp-servers/genshijin-shrink/README.md)。
+
+### genshijin-crew — 3 subagent preset
+
+長セッションでコンテキストを温存するための subagent 3種。
+
+| Subagent | 用途 |
+|----------|------|
+| `genshijin-investigator` | read-only locator (haiku model)、`file:line` 表で返却 |
+| `genshijin-builder` | 1-2ファイル surgical edit。3+ファイルは `too-big.` で拒否 |
+| `genshijin-reviewer` | severity-tagged finding (🔴bug / 🟡risk / 🔵nit / ❓question) |
+
+委譲判断ガイドは [skills/genshijin-crew/SKILL.md](./skills/genshijin-crew/SKILL.md)。
 
 ## マルチエージェント対応（v1.3.0〜）
 

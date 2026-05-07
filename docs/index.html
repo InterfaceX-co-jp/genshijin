@@ -4,15 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>genshijin - Claude Code Plugin</title>
-  <meta name="description" content="Claude Code向け超圧縮コミュニケーションスキル。トークン使用量を約75%削減しつつ、技術的正確性は100%維持。コミット・PRレビュー・メモリ圧縮サブスキル同梱。">
+  <meta name="description" content="Claude Code向け超圧縮コミュニケーションスキル。トークン使用量を約75%削減しつつ、技術的正確性は100%維持。コミット・PRレビュー・メモリ圧縮・stats可視化サブスキル＋3 subagent＋MCP middleware 同梱。">
   <meta property="og:title" content="genshijin - Claude Code 超圧縮スキル">
-  <meta property="og:description" content="トークン使用量を約75%削減しつつ、技術的正確性は100%維持。コミット・PRレビュー・メモリ圧縮サブスキル同梱の Claude Code プラグイン">
+  <meta property="og:description" content="トークン使用量を約75%削減しつつ、技術的正確性は100%維持。stats/subagent/MCP-shrink 同梱。">
   <meta property="og:image" content="https://interfacex-co-jp.github.io/genshijin/ogp.png">
   <meta property="og:url" content="https://interfacex-co-jp.github.io/genshijin/">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="genshijin - Claude Code 超圧縮スキル">
-  <meta name="twitter:description" content="トークン使用量を約75%削減しつつ、技術的正確性は100%維持。サブスキル4個同梱。">
+  <meta name="twitter:description" content="トークン使用量を約75%削減しつつ、技術的正確性は100%維持。サブスキル6個＋3 subagent同梱。">
   <meta name="twitter:image" content="https://interfacex-co-jp.github.io/genshijin/ogp.png">
   <style>
     :root {
@@ -733,7 +733,7 @@
     <section>
       <h2>サブスキル</h2>
       <p style="color: var(--text-muted); margin-bottom: 16px; font-size: 0.9rem;">
-        本体 <code>/genshijin</code> に加え、用途別サブスキル4個同梱。
+        本体 <code>/genshijin</code> に加え、用途別サブスキル6個同梱。
       </p>
       <div class="modes">
         <div class="mode">
@@ -747,6 +747,14 @@
         <div class="mode">
           <div class="mode-name"><code>/genshijin-compress</code></div>
           <div class="mode-desc"><code>CLAUDE.md</code> 等のメモリファイルを原始人モード化。入力トークンを永続削減。コード・URL・見出しは完全保持、機密ファイルは自動拒否。</div>
+        </div>
+        <div class="mode">
+          <div class="mode-name"><code>/genshijin-stats</code> <span style="color: var(--text-muted); font-size: 0.75rem;">v1.4.0〜</span></div>
+          <div class="mode-desc">現セッションのリアルトークン使用量＋推定削減量＋USD換算をフックが即時表示。<code>--share</code> で1行サマリ、<code>--all</code> / <code>--since 7d</code> でライフタイム集計。</div>
+        </div>
+        <div class="mode">
+          <div class="mode-name"><code>genshijin-crew</code> <span style="color: var(--text-muted); font-size: 0.75rem;">v1.4.0〜</span></div>
+          <div class="mode-desc">3 subagent (<code>investigator</code>/<code>builder</code>/<code>reviewer</code>) preset。tool-result が原始人圧縮 → 主コンテキスト消費約60%減で長セッション持続。</div>
         </div>
         <div class="mode">
           <div class="mode-name"><code>/genshijin-help</code></div>
@@ -790,6 +798,86 @@ echo '{"defaultMode":"extreme"}' \
         <div class="mode">
           <div class="mode-name">セキュリティ</div>
           <div class="mode-desc">フラグファイルは symlink 拒否・64バイト上限・モードホワイトリスト検証。秘密ファイルへの symlink 差替えで secret バイトが statusline やモデルコンテキストに流れ込む攻撃を塞ぐ。</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>v1.4.0 拡張機能 <span style="color: var(--text-muted); font-size: 0.9rem; font-weight: 400;">2026-05-07</span></h2>
+      <p style="color: var(--text-muted); margin-bottom: 16px; font-size: 0.9rem;">
+        caveman 本家 v1.3.0 以降の差分（stats receipts / smart installer / cavecrew相当 / cavepack相当 / MCP-shrink）を全項目移植。
+      </p>
+      <div class="modes">
+        <div class="mode" style="flex-direction: column; align-items: stretch;">
+          <div class="mode-name" style="margin-bottom: 8px;">📊 セッションStats可視化</div>
+          <div class="mode-desc">
+            <code>/genshijin-stats</code> でフックが <code>decision: "block"</code> で stats を即時返却。モデルは数値計算に介在しない。
+            <pre style="background: #111; border-radius: 6px; padding: 10px 12px; margin: 8px 0 0; overflow-x: auto; font-size: 0.75rem; line-height: 1.5;"><code>原始人 Stats
+─────────────────
+Turns:    24
+Output tokens:         18,432
+推定削減トークン:       34,231 (~65%)
+推定削減USD:           ~$0.51
+─────────────────
+メモリ圧縮済:           2 件, ~3,200 tokens セッション開始毎削減</code></pre>
+            <span style="color: var(--text-muted); font-size: 0.85rem; display: block; margin-top: 8px;"><code>claude-opus-4</code> / <code>sonnet-4</code> / <code>haiku-4</code> 系の per-million pricing で USD 自動換算。<code>--share</code> ツイート用、<code>--all</code> / <code>--since 7d</code> ライフタイム集計対応。</span>
+          </div>
+        </div>
+
+        <div class="mode" style="flex-direction: column; align-items: stretch;">
+          <div class="mode-name" style="margin-bottom: 8px;">🤖 3 subagent preset (genshijin-crew)</div>
+          <div class="mode-desc">
+            主スレッド消費トークンを約60%削減。長セッション持続用。
+            <ul style="margin: 8px 0 0; padding-left: 20px; line-height: 1.7;">
+              <li><code>genshijin-investigator</code> — read-only locator (haiku model)、<code>file:line</code> 表で返却</li>
+              <li><code>genshijin-builder</code> — 1-2ファイル surgical edit、3+ファイルは <code>too-big.</code> で拒否</li>
+              <li><code>genshijin-reviewer</code> — severity-tagged finding (🔴bug/🟡risk/🔵nit/❓question)</li>
+            </ul>
+            <span style="color: var(--text-muted); font-size: 0.85rem; display: block; margin-top: 8px;">出力契約は <code>skills/genshijin-crew/SKILL.md</code> に厳密定義 → 主スレッドは <code>path:\d+</code> でgrepできる。</span>
+          </div>
+        </div>
+
+        <div class="mode" style="flex-direction: column; align-items: stretch;">
+          <div class="mode-name" style="margin-bottom: 8px;">🪨 genshijin-shrink (MCP middleware)</div>
+          <div class="mode-desc">
+            任意の MCP server を wrap → <code>tools/list</code> の <code>description</code> field を圧縮。コード/URL/パス/識別子は byte-for-byte 保護。
+            <pre style="background: #111; border-radius: 6px; padding: 10px 12px; margin: 8px 0 0; overflow-x: auto; font-size: 0.75rem; line-height: 1.5;"><code>"mcpServers": {
+  "fs-shrunk": {
+    "command": "npx",
+    "args": ["genshijin-shrink",
+             "npx", "@modelcontextprotocol/server-filesystem",
+             "/path"]
+  }
+}</code></pre>
+            <span style="color: var(--text-muted); font-size: 0.85rem; display: block; margin-top: 8px;">英語＋日本語散文両対応。<code>tools/call</code> レスポンスは無変更で pass-through（downstream 破壊リスク回避）。</span>
+          </div>
+        </div>
+
+        <div class="mode" style="flex-direction: column; align-items: stretch;">
+          <div class="mode-name" style="margin-bottom: 8px;">⚙️ Smart multi-agent installer</div>
+          <div class="mode-desc">
+            Claude Code/Cursor/Windsurf/Cline/Copilot を自動検出し、各 agent に native install。
+            <pre style="background: #111; border-radius: 6px; padding: 10px 12px; margin: 8px 0 0; overflow-x: auto; font-size: 0.75rem; line-height: 1.5;"><code># macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/InterfaceX-co-jp/genshijin/main/install.sh | bash
+
+# Windows
+iwr -useb https://raw.githubusercontent.com/InterfaceX-co-jp/genshijin/main/install.ps1 | iex</code></pre>
+            <span style="color: var(--text-muted); font-size: 0.85rem; display: block; margin-top: 8px;"><code>--dry-run</code> / <code>--force</code> / <code>--only &lt;agent&gt;</code> / <code>--all</code> / <code>--minimal</code> / <code>--list</code> 対応。再実行安全。</span>
+          </div>
+        </div>
+
+        <div class="mode" style="flex-direction: column; align-items: stretch;">
+          <div class="mode-name" style="margin-bottom: 8px;">🚀 genshijin-init (per-repo rule投下)</div>
+          <div class="mode-desc">
+            1コマンドで対象 repo に常時有効化 rule を全 IDE agent 用に投下。idempotent。
+            <pre style="background: #111; border-radius: 6px; padding: 10px 12px; margin: 8px 0 0; overflow-x: auto; font-size: 0.75rem; line-height: 1.5;"><code>npx -y https://raw.githubusercontent.com/InterfaceX-co-jp/genshijin/main/tools/genshijin-init.js</code></pre>
+            <span style="color: var(--text-muted); font-size: 0.85rem; display: block; margin-top: 8px;">Cursor/Windsurf/Cline/Copilot/AGENTS.md 用 rule file 生成。<code>--dry-run</code> / <code>--force</code> / <code>--only</code>。</span>
+          </div>
+        </div>
+
+        <div class="mode">
+          <div class="mode-name">🛡 ultra-mode code-symbol guard</div>
+          <div class="mode-desc">極限モードでも <code>useEffect</code>/<code>SIGTERM</code> 等のコードシンボル/関数名/API名/エラー文字列の略称化を明示禁止。Auto-Clarity 条件も拡張（多段手順誤読リスク・LaTeX/SQL 境界・ユーザー混乱表明時）。</div>
         </div>
       </div>
     </section>

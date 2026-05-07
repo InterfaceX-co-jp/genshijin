@@ -62,21 +62,19 @@ function getDefaultMode() {
   return 'normal';
 }
 
-// Symlink-safe フラグファイル書込。親ディレクトリと対象ファイル両方で
-// symlink を拒否し、O_NOFOLLOW を使い、temp + rename で 0o600 アトミック書込。
+// Symlink-safe フラグファイル書込。immediate parent ディレクトリと対象ファイル
+// 両方で symlink を拒否し、O_NOFOLLOW を使い、temp + rename で 0o600 アトミック書込。
 // 予測可能なフラグパス（~/.claude/.genshijin-active）を symlink で差し替えて
 // 他のファイルを破壊する攻撃を塞ぐ。
+//
+// 注: ~/.claude 自体が symlink の環境（Nix / dotfiles管理 / Docker bind-mount）
+// が存在するため、parent dir resolved path のみチェック。フルチェイン検証は誤拒否多。
 function safeWriteFlag(flagPath, content) {
   try {
     const flagDir = path.dirname(flagPath);
     fs.mkdirSync(flagDir, { recursive: true });
 
-    try {
-      if (fs.lstatSync(flagDir).isSymbolicLink()) return;
-    } catch (e) {
-      return;
-    }
-
+    // flagPath 自体が symlink なら拒否 (filename自体の差替防止)
     try {
       if (fs.lstatSync(flagPath).isSymbolicLink()) return;
     } catch (e) {
@@ -137,6 +135,65 @@ function readFlag(flagPath) {
   }
 }
 
+// 履歴ログ append (lifetime stats 用)。symlink-safe + JSONL line append。
+// readFlag/safeWriteFlag と違いサイズ上限なし。1行=1JSONエントリ前提。
+function appendFlag(flagPath, line) {
+  try {
+    const flagDir = path.dirname(flagPath);
+    fs.mkdirSync(flagDir, { recursive: true });
+
+    try {
+      if (fs.lstatSync(flagPath).isSymbolicLink()) return;
+    } catch (e) {
+      if (e.code !== 'ENOENT') return;
+    }
+
+    const O_NOFOLLOW = typeof fs.constants.O_NOFOLLOW === 'number' ? fs.constants.O_NOFOLLOW : 0;
+    const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_APPEND | O_NOFOLLOW;
+    let fd;
+    try {
+      fd = fs.openSync(flagPath, flags, 0o600);
+      fs.writeSync(fd, String(line).replace(/\n+$/, '') + '\n');
+    } finally {
+      if (fd !== undefined) fs.closeSync(fd);
+    }
+  } catch (e) {
+    // silent fail
+  }
+}
+
+// 履歴ログ読込。symlink拒否、最大10MBで打切。
+const MAX_HISTORY_BYTES = 10 * 1024 * 1024;
+
+function readHistory(flagPath) {
+  try {
+    let st;
+    try {
+      st = fs.lstatSync(flagPath);
+    } catch (e) {
+      return [];
+    }
+    if (st.isSymbolicLink() || !st.isFile()) return [];
+
+    const O_NOFOLLOW = typeof fs.constants.O_NOFOLLOW === 'number' ? fs.constants.O_NOFOLLOW : 0;
+    const flags = fs.constants.O_RDONLY | O_NOFOLLOW;
+    let fd;
+    let raw;
+    try {
+      fd = fs.openSync(flagPath, flags);
+      const size = Math.min(st.size, MAX_HISTORY_BYTES);
+      const buf = Buffer.alloc(size);
+      fs.readSync(fd, buf, 0, size, 0);
+      raw = buf.toString('utf8');
+    } finally {
+      if (fd !== undefined) fs.closeSync(fd);
+    }
+    return raw.split('\n').filter(line => line.trim());
+  } catch (e) {
+    return [];
+  }
+}
+
 module.exports = {
   getDefaultMode,
   getConfigDir,
@@ -144,5 +201,7 @@ module.exports = {
   VALID_MODES,
   MODE_TO_LABEL,
   safeWriteFlag,
-  readFlag
+  readFlag,
+  appendFlag,
+  readHistory
 };

@@ -6,15 +6,29 @@ genshijin メモリ圧縮オーケストレータ
     python scripts/compress.py <filepath>
 """
 
+import io
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 from typing import List
+
+# Windows 環境 cp932 stdout で日本語/特殊文字 UnicodeEncodeError 回避。
+# Python 3.7+ は reconfigure 利用可。古い環境は io.TextIOWrapper でラップ。
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except (AttributeError, io.UnsupportedOperation):
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 OUTER_FENCE_REGEX = re.compile(
     r"\A\s*(`{3,}|~{3,})[^\n]*\n(.*)\n\1\s*\Z", re.DOTALL
 )
+
+# Frontmatter (YAML) 検出 — 圧縮後ファイル先頭余白除去用
+FRONTMATTER_REGEX = re.compile(r"\A(---\s*\n.*?\n---\s*\n)", re.DOTALL)
 
 # 機密・PII を含む可能性高いファイル名/パス。圧縮すると Anthropic API に生データ送信 →
 # 機密リポジトリでは越えられない第三者データ境界。detect.py は .env を拡張子で弾くが、
@@ -60,6 +74,25 @@ def strip_llm_wrapper(text: str) -> str:
     m = OUTER_FENCE_REGEX.match(text)
     if m:
         return m.group(2)
+    return text
+
+
+def cleanup_compressed(text: str) -> str:
+    """圧縮後テキストの最終整形:
+    - frontmatter 後の連続空行を1行に
+    - 末尾改行正規化 (1個)
+    - 先頭BOM除去
+    """
+    if text.startswith("﻿"):
+        text = text[1:]
+    # frontmatter 後の余白整形
+    m = FRONTMATTER_REGEX.match(text)
+    if m:
+        head = m.group(1)
+        rest = text[len(head):].lstrip("\n")
+        text = head + "\n" + rest
+    # 末尾改行 1個に
+    text = text.rstrip() + "\n"
     return text
 
 
@@ -183,7 +216,13 @@ def compress_file(filepath: Path) -> bool:
         print("スキップ（自然言語ではない）")
         return False
 
-    original_text = filepath.read_text(errors="ignore")
+    original_text = filepath.read_text(encoding="utf-8", errors="replace")
+
+    # 空ファイル ガード — Claude API 送信不要、原ファイル無変更
+    if not original_text.strip():
+        print("スキップ: 空ファイル")
+        return False
+
     backup_path = filepath.with_name(filepath.stem + ".original.md")
 
     # バックアップ既存時は誤上書き防止のため中止
@@ -195,11 +234,16 @@ def compress_file(filepath: Path) -> bool:
 
     # Step 1: 圧縮
     print("Claude で圧縮中...")
-    compressed = call_claude(build_compress_prompt(original_text))
+    compressed = cleanup_compressed(call_claude(build_compress_prompt(original_text)))
+
+    # 同一出力 ガード — Claude が圧縮失敗 or 既に圧縮済の場合バックアップ作らず終了
+    if compressed.strip() == original_text.strip():
+        print("スキップ: 圧縮効果なし（既に最小形 or LLM未削減）")
+        return False
 
     # 原ファイルをバックアップ、圧縮版を原パスに書き込み
-    backup_path.write_text(original_text)
-    filepath.write_text(compressed)
+    backup_path.write_text(original_text, encoding="utf-8")
+    filepath.write_text(compressed, encoding="utf-8")
 
     # Step 2: 検証 + リトライ
     for attempt in range(MAX_RETRIES):
@@ -217,15 +261,15 @@ def compress_file(filepath: Path) -> bool:
 
         if attempt == MAX_RETRIES - 1:
             # 失敗時は原ファイル復元
-            filepath.write_text(original_text)
+            filepath.write_text(original_text, encoding="utf-8")
             backup_path.unlink(missing_ok=True)
             print("❌ リトライ後も失敗 — 原ファイル復元")
             return False
 
         print("Claude でピンポイント修正中...")
-        compressed = call_claude(
+        compressed = cleanup_compressed(call_claude(
             build_fix_prompt(original_text, compressed, result.errors)
-        )
-        filepath.write_text(compressed)
+        ))
+        filepath.write_text(compressed, encoding="utf-8")
 
     return True
