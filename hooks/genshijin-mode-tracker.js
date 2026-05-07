@@ -6,7 +6,15 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { getDefaultMode, safeWriteFlag, readFlag } = require('./genshijin-config');
+const { execFileSync } = require('child_process');
+const { getDefaultMode, safeWriteFlag, readFlag, VALID_MODES } = require('./genshijin-config');
+
+// 独立スキルモード — 自身のスラッシュコマンド (/genshijin-commit 等) で起動。
+// /genshijin <arg> 経由で選択不可。
+const INDEPENDENT_MODES = new Set(['commit', 'review', 'compress', 'help']);
+
+// /genshijin <arg> で選択可能なベースモード（独立スキル除外）
+const BASE_MODES = new Set(['polite', 'normal', 'extreme']);
 
 const claudeDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
 const flagPath = path.join(claudeDir, '.genshijin-active');
@@ -19,8 +27,33 @@ process.stdin.on('end', () => {
     const prompt = (data.prompt || '').trim();
     const lower = prompt.toLowerCase();
 
+    // /genshijin-stats — フック側でブロック実行し結果を reason として注入。
+    // モデルは何もせずユーザーに数値を即時表示する。
+    const statsMatch = /^\/genshijin(?::genshijin)?-stats(?:\s+(.*))?$/i.exec(prompt);
+    if (statsMatch) {
+      const tailArgs = (statsMatch[1] || '').trim().split(/\s+/).filter(Boolean);
+      try {
+        const statsPath = path.join(__dirname, 'genshijin-stats.js');
+        const argv = [statsPath];
+        if (data.transcript_path) argv.push('--session-file', data.transcript_path);
+        if (tailArgs.includes('--share')) argv.push('--share');
+        if (tailArgs.includes('--all')) argv.push('--all');
+        const sinceIdx = tailArgs.indexOf('--since');
+        if (sinceIdx !== -1 && tailArgs[sinceIdx + 1]) {
+          argv.push('--since', tailArgs[sinceIdx + 1]);
+        }
+        const out = execFileSync(process.execPath, argv, { encoding: 'utf8', timeout: 5000 });
+        process.stdout.write(JSON.stringify({ decision: 'block', reason: out.trim() }));
+      } catch (e) {
+        process.stdout.write(JSON.stringify({
+          decision: 'block',
+          reason: 'genshijin-stats: 起動失敗。手動実行: node hooks/genshijin-stats.js'
+        }));
+      }
+      return;
+    }
+
     // 自然言語アクティベーション
-    // 「原始人モード」「原始人で」「原始人にして」「短く」「簡潔に」「トークン節約」等
     const activateJa = /(原始人|げんしじん)/.test(prompt) &&
       /(モード|起動|有効|オン|で|にして|化)/.test(prompt) &&
       !/(やめて|解除|停止|オフ|無効)/.test(prompt);
@@ -49,24 +82,26 @@ process.stdin.on('end', () => {
       } else if (cmd === '/genshijin-help' || cmd === '/genshijin:genshijin-help') {
         mode = 'help';
       } else if (cmd === '/genshijin' || cmd === '/genshijin:genshijin') {
-        // 日本語レベル名 → ASCII 内部識別子
-        if (arg === '丁寧' || arg.toLowerCase() === 'polite' || arg.toLowerCase() === 'teinei') {
+        // 引数なし → デフォルトモード起動
+        if (!arg) {
+          mode = getDefaultMode();
+        } else if (arg === 'off' || arg === 'stop' || arg === 'disable') {
+          mode = 'off';
+        } else if (arg === '丁寧' || arg.toLowerCase() === 'polite' || arg.toLowerCase() === 'teinei') {
           mode = 'polite';
         } else if (arg === '通常' || arg.toLowerCase() === 'normal' || arg.toLowerCase() === 'futsuu') {
           mode = 'normal';
         } else if (arg === '極限' || arg.toLowerCase() === 'extreme' || arg.toLowerCase() === 'kyokugen') {
           mode = 'extreme';
-        } else if (arg.toLowerCase() === 'off') {
-          mode = 'off';
-        } else {
-          mode = getDefaultMode();
         }
+        // 不正引数 → mode は null のまま、フラグ未変更（silent overwrite 防止）
       }
 
-      if (mode && mode !== 'off') {
-        safeWriteFlag(flagPath, mode);
-      } else if (mode === 'off') {
+      // ホワイトリスト最終検証 — INDEPENDENT_MODES + BASE_MODES のみ書込許可
+      if (mode === 'off') {
         try { fs.unlinkSync(flagPath); } catch (e) {}
+      } else if (mode && (BASE_MODES.has(mode) || INDEPENDENT_MODES.has(mode))) {
+        safeWriteFlag(flagPath, mode);
       }
     }
 
@@ -87,7 +122,6 @@ process.stdin.on('end', () => {
     // 独立モード（commit/review/compress/help）はスキル側挙動と競合するためスキップ。
     // readFlag は symlink-safe + サイズ上限 + VALID_MODES ホワイトリスト。
     // 不正値は null → コンテキストに untrusted bytes 注入せず。
-    const INDEPENDENT_MODES = new Set(['commit', 'review', 'compress', 'help']);
     const activeMode = readFlag(flagPath);
     if (activeMode && !INDEPENDENT_MODES.has(activeMode)) {
       const LABEL = { polite: '丁寧', normal: '通常', extreme: '極限' };

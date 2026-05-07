@@ -1,7 +1,7 @@
 {
   "name": "genshijin",
-  "version": "1.3.0",
-  "description": "超圧縮コミュニケーションモード。原始人のように話してトークン使用量を約75%削減しつつ、技術的正確性は完全に維持。日本語に最適化。コミット生成・PRレビュー・メモリ圧縮サブスキル同梱。SessionStart/UserPromptSubmit フックでモード追跡・毎ターン補強・ドリフト防止。スラッシュコマンド /genshijin /genshijin-commit /genshijin-review 付属。Cursor/Windsurf/Cline/Copilot 等マルチエージェント対応。",
+  "version": "1.4.0",
+  "description": "超圧縮コミュニケーションモード。原始人のように話してトークン使用量を約75%削減しつつ、技術的正確性は完全に維持。日本語に最適化。コミット生成・PRレビュー・メモリ圧縮・stats可視化サブスキル同梱。SessionStart/UserPromptSubmit フックでモード追跡・毎ターン補強・ドリフト防止・/genshijin-stats でセッション削減量＋USD推定表示。MCP middleware (genshijin-shrink) でMCPツール記述も圧縮。スラッシュコマンド /genshijin /genshijin-commit /genshijin-review /genshijin-stats 付属。Cursor/Windsurf/Cline/Copilot 等マルチエージェント対応。3 cavecrew相当 subagent (investigator/builder/reviewer) で長セッションコンテキスト持続。",
   "author": {
     "name": "InterfaceX-co-jp",
     "url": "https://github.com/InterfaceX-co-jp"
@@ -9,7 +9,7 @@
   "homepage": "https://interfacex-co-jp.github.io/genshijin/",
   "repository": "https://github.com/InterfaceX-co-jp/genshijin",
   "license": "MIT",
-  "keywords": ["productivity", "communication", "brevity", "japanese", "日本語", "commit", "review", "compress", "memory", "hooks", "statusline", "commands", "cursor", "windsurf", "cline", "copilot"],
+  "keywords": ["productivity", "communication", "brevity", "japanese", "日本語", "commit", "review", "compress", "stats", "mcp", "subagent", "hooks", "statusline", "commands", "cursor", "windsurf", "cline", "copilot"],
   "hooks": {
     "SessionStart": [
       {

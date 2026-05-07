@@ -6,6 +6,12 @@
 - Claudeのマーケットプレイスに無事公開されました🎉
 - [`genshijin@v1.3.0`](https://github.com/InterfaceX-co-jp/genshijin/releases/tag/v1.3.0)を公開しました。マルチエージェント対応やセキュリティ対応、ベンチマーク更新などを含めています
 
+@追記: 2026年5月7日
+- [`genshijin@v1.4.0`](https://github.com/InterfaceX-co-jp/genshijin/releases/tag/v1.4.0)を公開しました
+- caveman本家v1.3.0以降の差分（stats receipts / smart installer / cavecrew相当 / cavepack相当 / MCP-shrink）を全項目移植
+- 主な追加: `/genshijin-stats` でリアルセッション削減量＋USD推定表示、3 subagent (`genshijin-investigator/builder/reviewer`) で長セッションコンテキスト持続、`genshijin-shrink` MCP middleware、root マルチエージェント installer、ultra-mode code-symbol guard 強化
+- 技術的に面白いトピックを下記「v1.4.0 技術深掘り」に追加（[MCP middleware proxy の仕組み](#mcp-middleware-proxy-の仕組み)、[USD換算の見積もり方法](#usd換算の見積もり方法), [subagent 圧縮による長セッション持続](#subagent-圧縮による長セッション持続)）
+
 ## TL;DR
 
 - **caveman**: Claude Code向けの英語圧縮スキル。冠詞やフィラーを消してトークン約68%削減
@@ -540,6 +546,192 @@ Claude Code プラグイン機構を使わずに、フックだけを手動導�
 - `genshijin`（日本語特化スキル）
 
 `genshijin vs 簡潔` の差分こそが、skill 自体が汎用的な terse 指示を超えて削減する純粋な効果量になる。
+
+## v1.4.0 技術深掘り
+
+v1.4.0 で本家 caveman v1.3.0 以降の機能をまとめて移植した。中でも実装としておもしろい3つを掘り下げる。
+
+### MCP middleware proxy の仕組み
+
+`genshijin-shrink` は MCP（Model Context Protocol）の **stdio middleware proxy** だ。Claude（or 任意の MCP client）と upstream MCP server の間に挟まり、JSON-RPC レスポンス内の `description` field だけを圧縮する。
+
+なぜこれが効くか。MCP サーバーは Claude に「このツールが使えるよ」と教えるとき、`tools/list` という RPC で全ツールのメタデータを返す。これがトークンを食う。例えば Filesystem MCP サーバーは数十のツール × 各 200〜400 トークンの英語 description で **数千トークンを毎セッション開始時に消費**する。
+
+genshijin-shrink はそこを削る。
+
+```
+Claude  ←→  genshijin-shrink (proxy)  ←→  upstream MCP server
+                ↑
+        tools/list レスポンスを intercept
+        description field のみ圧縮
+        コード/URL/パス/識別子は byte-for-byte 保護
+```
+
+実装で気をつけたポイント:
+
+1. **stdio line-buffering**：JSON-RPC は1行1メッセージなので両方向で line buffer を入れる。途中で stdin/stdout が部分的に flush されても reassemble する。
+2. **保護トークンの sentinel 置換**：圧縮前に code block / URL / パス / CamelCase 識別子を sentinel 文字列に置換 → 散文部分だけを正規表現で削る → sentinel を元に戻す。これで `useEffect` や `https://...` を絶対に壊さない。
+3. **request side は無変更で pass-through**：upstream に向かう request body は触らない。`tools/call` のレスポンスも触らない（content を mutate すると downstream parsing が壊れるリスクが高い）。**v1 は徹底的に保守的**にして、`tools/list` / `prompts/list` / `resources/list` の `description` だけに介入する。
+
+```js
+// 保護パターン (mcp-servers/genshijin-shrink/compress.js)
+const PROTECTED_PATTERNS = [
+  /```[\s\S]*?```/g,                          // fenced code
+  /`[^`\n]+`/g,                               // inline code
+  /\bhttps?:\/\/\S+/gi,                       // URLs
+  /\b[\w.-]*[\/\\][\w.\/\\\-]+/g,             // paths
+  /\b[A-Z][A-Za-z0-9]*(?:_[A-Z][A-Za-z0-9]*)+\b/g, // CONST_CASE
+  /\b\w+\.\w+(?:\.\w+)*\(\)?/g,               // dotted.method()
+  /[A-Za-z_][A-Za-z0-9_]*\s*\([^)]*\)/g,      // function calls
+  /\b\d+\.\d+\.\d+\b/g,                       // semver
+];
+```
+
+LSP（Language Server Protocol）に触ったことがあるエンジニアなら、stdio middleware proxy のパターンは馴染み深いはずだ。**MCP も同じ JSON-RPC ベース**なので、同じ middleware アプローチが効く。MCP エコシステムが今後広がっていくほど、この種の proxy 系ツールの価値は上がる。
+
+### USD換算の見積もり方法
+
+`/genshijin-stats` は「セッションで $29 削減」みたいな数字を出す。これがどう計算されているか説明する。
+
+#### Step 1: 実消費トークンの取得
+
+Claude Code はセッションログを `~/.claude/projects/<project>/<session-id>.jsonl` に書き出す。1行1JSON エントリで、assistant メッセージには `usage.output_tokens` が含まれる。
+
+```js
+// hooks/genshijin-stats.js
+function parseSession(filePath) {
+  const raw = fs.readFileSync(filePath, 'utf8');
+  let outputTokens = 0, turns = 0, model = null;
+  for (const line of raw.split('\n')) {
+    const entry = JSON.parse(line);
+    if (entry.type !== 'assistant') continue;
+    outputTokens += entry.message.usage.output_tokens || 0;
+    turns++;
+    if (!model) model = entry.message.model;
+  }
+  return { outputTokens, turns, model };
+}
+```
+
+ここでポイントは「**AI 推定ではなく実ファイルから読む**」こと。Claude 自身に「君何トークン使った？」と聞くと適当な数字を返してくる。フックスクリプトが直接 JSONL を parse して数えるので、数値の信頼性は 100%。
+
+#### Step 2: 推定削減量の計算
+
+ベンチマークで「genshijin 通常モードは平均 65% 削減」と分かっている。`actual_output = normal_output × (1 - 0.65)` の関係から逆算:
+
+```
+estimated_normal = actual_output / (1 - 0.65)
+estimated_saved  = estimated_normal - actual_output
+```
+
+つまり実出力が 18,000 トークンなら、推定で 51,400 トークン使うはずだったところを 33,400 トークン削った計算になる。
+
+#### Step 3: USD 換算
+
+Anthropic の出力トークン pricing を model id prefix で照合する:
+
+```js
+const MODEL_OUTPUT_PRICE_PER_M = [
+  ['claude-opus-4',     75.00],
+  ['claude-sonnet-4',   15.00],
+  ['claude-haiku-4',     4.00],
+  // ...
+];
+
+function priceForModel(model) {
+  for (const [prefix, price] of MODEL_OUTPUT_PRICE_PER_M) {
+    if (model.startsWith(prefix)) return price;
+  }
+  return null;
+}
+```
+
+prefix 照合にしている理由：`claude-sonnet-4-20250514` も `claude-sonnet-4-7` も同じ料金階層なので、point release ごとに table を更新する手間を避ける。新しいモデル世代が出たときだけ entry を追加すれば良い。
+
+最終計算:
+
+```
+estimated_saved_usd = (estimated_saved_tokens / 1_000_000) × price_per_million
+```
+
+これで「セッションで $0.51 削減」が出る。
+
+#### なぜこれが「正直な数字」なのか
+
+`estimated_saved` は **平均 65%** という前提が成立している場合の見積もり。タスクによっては圧縮率が 40% のこともあるし 80% のこともある。だから出力には常にこう書く:
+
+> 推定値 = benchmarks/ 平均値由来。実数はタスク依存。
+
+実消費（左半分）は 100% 正確。推定削減（右半分）は **事前ベンチマーク統計の適用結果** であってモデルが幻覚で答えた数字ではない。これがさり気ないけど大事。
+
+#### Lifetime 集計
+
+`.genshijin-history.jsonl` に session 毎のスナップショットを append し、`/genshijin-stats --all` で集計する。**`session_id` で latest-per-session を取る**ことで、同セッション内で何度 `/stats` を叩いてもダブルカウントを避けている:
+
+```js
+const latestPerSession = new Map();
+for (const entry of historyEntries) {
+  const id = entry.session_id;
+  const prev = latestPerSession.get(id);
+  if (!prev || entry.ts >= prev.ts) latestPerSession.set(id, entry);
+}
+```
+
+これは時系列ログを集計するときの定番パターン。Datadog や Prometheus を触ったことがあるなら馴染みの dedup ロジックだ。
+
+エンジニアが [`rtk gain`](https://github.com/your-handle/rtk) や `time` コマンドの出力を眺めるのが好きなのと同じで、**自分が削った数字が見えると嬉しい**。`genshijin-stats` も同じ気持ちで作った。
+
+### subagent 圧縮による長セッション持続
+
+`genshijin-crew` は3つの Claude Code subagent preset。
+
+| Subagent | 役割 |
+|----------|------|
+| `genshijin-investigator` | read-only コード位置特定（haiku model） |
+| `genshijin-builder` | 1-2ファイル surgical 編集 |
+| `genshijin-reviewer` | severity-tagged レビュー（haiku model） |
+
+なぜこれが必要か。Claude Code には `Explore`（vanilla）という subagent があって、コードを探させたら散文で結果を返してくる。
+
+```
+Sure! I'll search for the safeWriteFlag function. I found it defined in
+hooks/genshijin-config.js at line 81. It's an atomic write function that
+uses O_NOFOLLOW to prevent symlink attacks. It's called from...
+（2,000トークン）
+```
+
+この 2,000 トークンが **主スレッドのコンテキストに verbatim 注入される**。20回 Explore を叩くと 40,000 トークンが脇の調査ログでコンテキストを食う。長セッションが context exhaustion で死ぬ典型パターン。
+
+`genshijin-investigator` は同じ仕事を圧縮形式で返す:
+
+```
+Defs:
+- hooks/genshijin-config.js:81 — `safeWriteFlag` — atomic write w/ O_NOFOLLOW
+Callers:
+- hooks/genshijin-mode-tracker.js:33,87
+- hooks/genshijin-activate.js:40
+1 def, 2 callers.
+（700トークン）
+```
+
+3分の1のトークンで同じ情報。**delegations が多いほど効く**ので、1セッションで 30 〜 50 回 subagent を呼ぶような長作業（refactoring / migration / 大規模調査）で context budget が大きく持続する。
+
+実装上のキモは「**出力契約を厳密に書いた SKILL.md**」だ。subagent に「圧縮して返してね」と頼むだけだと表記揺れが出る。だから出力フォーマットを SKILL.md に明示する:
+
+```
+出力形式:
+<path:line> — `<symbol>` — <≤6語メモ>
+
+3行以上時は1語ヘッダ付与: Defs: / Refs: / Callers: / Tests: / Imports:
+0ヒット → No match.
+末尾 → 集計: 2 defs, 5 refs.
+```
+
+これで主スレッド側は `path:\d+` で grep して結果を機械的に拾える。**human-readable と machine-readable の両立**は subagent 設計の難所で、cavecrew はそこをよく解いている。
+
+### モデル独自の挙動が必要な領域は LLM に任せ、構造化された結果が欲しい場面は subagent + 出力契約で固める
+
+これが v1.4.0 で広く適用された設計原則だ。`/genshijin-stats` も同様で、数値計算を Claude にやらせず Node スクリプトに任せ、Claude は表示しか担当しない（フックが `decision: "block"` で文字列を返すだけ）。LLM の周辺ツールを書くときの定石として覚えておくと使い回せる。
 
 ## まとめ
 

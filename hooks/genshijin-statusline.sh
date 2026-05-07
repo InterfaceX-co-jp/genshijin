@@ -39,3 +39,12 @@ if [ -z "$LABEL" ]; then
 else
   printf '\033[38;5;172m[原始人:%s]\033[0m' "$LABEL"
 fi
+
+# /genshijin-stats が書出した savings suffix を末尾に付加 (存在時のみ)
+SUFFIX_PATH="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.genshijin-statusline-suffix"
+if [ -f "$SUFFIX_PATH" ] && [ ! -L "$SUFFIX_PATH" ]; then
+  SUFFIX=$(head -c 32 "$SUFFIX_PATH" 2>/dev/null | tr -d '\n\r')
+  if [ -n "$SUFFIX" ]; then
+    printf ' \033[38;5;108m%s\033[0m' "$SUFFIX"
+  fi
+fi

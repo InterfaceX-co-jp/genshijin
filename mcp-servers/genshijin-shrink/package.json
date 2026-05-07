@@ -1,0 +1,32 @@
+{
+  "name": "genshijin-shrink",
+  "version": "0.1.0",
+  "description": "MCP proxy that compresses prose fields (tool descriptions, etc.) using genshijin rules. Same accuracy, fewer context tokens. Japanese + English.",
+  "license": "MIT",
+  "homepage": "https://github.com/InterfaceX-co-jp/genshijin",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/InterfaceX-co-jp/genshijin.git",
+    "directory": "mcp-servers/genshijin-shrink"
+  },
+  "author": "InterfaceX-co-jp",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "genshijin",
+    "原始人",
+    "proxy",
+    "tokens",
+    "japanese"
+  ],
+  "main": "compress.js",
+  "bin": {
+    "genshijin-shrink": "index.js"
+  },
+  "files": [
+    "index.js",
+    "compress.js",
+    "README.md"
+  ]
+}

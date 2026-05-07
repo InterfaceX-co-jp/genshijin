@@ -1,0 +1,2 @@
+description = "現セッションのリアルトークン使用量 + 推定削減量"
+prompt = "/genshijin-stats"
