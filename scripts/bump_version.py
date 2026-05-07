@@ -6,7 +6,7 @@
     python3 scripts/bump_version.py {patch|minor|major} [--dry-run]
 
 挙動:
-    1. .claude-plugin/plugin.json から現バージョン取得
+    1. packages/skill-claude/.claude-plugin/plugin.json から現バージョン取得
     2. bump 種別に応じて新バージョン算出
     3. plugin.json の version を更新
     4. CHANGELOG.md の [Unreleased] を [X.Y.Z] - YYYY-MM-DD にリネーム、
@@ -26,7 +26,7 @@ import re
 import sys
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
-PLUGIN_JSON = REPO_ROOT / ".claude-plugin" / "plugin.json"
+PLUGIN_JSON = REPO_ROOT / "packages" / "skill-claude" / ".claude-plugin" / "plugin.json"
 CHANGELOG = REPO_ROOT / "CHANGELOG.md"
 COMPARE_BASE = "https://github.com/InterfaceX-co-jp/genshijin"
 

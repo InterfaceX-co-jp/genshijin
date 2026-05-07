@@ -5,10 +5,13 @@
     "name": "InterfaceX-co-jp",
     "url": "https://github.com/InterfaceX-co-jp"
   },
+  "metadata": {
+    "pluginRoot": "./packages"
+  },
   "plugins": [
     {
       "name": "genshijin",
-      "source": "./",
+      "source": "skill-claude",
       "category": "productivity",
       "description": "超圧縮コミュニケーションモード。日本語に最適化された原始人スキル。"
     }

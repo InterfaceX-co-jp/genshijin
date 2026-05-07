@@ -1,7 +1,7 @@
-@./skills/genshijin/SKILL.md
-@./skills/genshijin-commit/SKILL.md
-@./skills/genshijin-review/SKILL.md
-@./skills/genshijin-help/SKILL.md
-@./skills/genshijin-compress/SKILL.md
-@./skills/genshijin-stats/SKILL.md
-@./skills/genshijin-crew/SKILL.md
+@./packages/skill-claude/skills/genshijin/SKILL.md
+@./packages/skill-claude/skills/genshijin-commit/SKILL.md
+@./packages/skill-claude/skills/genshijin-review/SKILL.md
+@./packages/skill-claude/skills/genshijin-help/SKILL.md
+@./packages/skill-claude/skills/genshijin-compress/SKILL.md
+@./packages/skill-claude/skills/genshijin-stats/SKILL.md
+@./packages/skill-claude/skills/genshijin-crew/SKILL.md

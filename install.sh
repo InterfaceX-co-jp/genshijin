@@ -15,7 +15,7 @@ set -euo pipefail
 # ── 定数 ──────────────────────────────────────────────────────────────
 REPO="InterfaceX-co-jp/genshijin"
 RAW_BASE="https://raw.githubusercontent.com/$REPO/main"
-HOOKS_INSTALL_URL="$RAW_BASE/hooks/install.sh"
+HOOKS_INSTALL_URL="$RAW_BASE/packages/skill-claude/hooks/install.sh"
 INIT_SCRIPT_URL="$RAW_BASE/tools/genshijin-init.js"
 MCP_SHRINK_PKG="genshijin-shrink"
 

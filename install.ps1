@@ -21,7 +21,7 @@ param(
 
 $Repo = "InterfaceX-co-jp/genshijin"
 $RawBase = "https://raw.githubusercontent.com/$Repo/main"
-$HooksInstallUrl = "$RawBase/hooks/install.ps1"
+$HooksInstallUrl = "$RawBase/packages/skill-claude/hooks/install.ps1"
 $InitScriptUrl = "$RawBase/tools/genshijin-init.js"
 $McpShrinkPkg = "genshijin-shrink"
 

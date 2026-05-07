@@ -47,7 +47,7 @@ jobs:
       - name: Verify plugin.json version matches tag (push tag 時のみ)
         if: github.event_name == 'push'
         run: |
-          MANIFEST_VERSION=$(python3 -c "import json; print(json.load(open('.claude-plugin/plugin.json'))['version'])")
+          MANIFEST_VERSION=$(python3 -c "import json; print(json.load(open('packages/skill-claude/.claude-plugin/plugin.json'))['version'])")
           TAG_VERSION="${{ steps.version.outputs.version }}"
           if [ "$MANIFEST_VERSION" != "$TAG_VERSION" ]; then
             echo "::error::plugin.json version ($MANIFEST_VERSION) はタグ ($TAG_VERSION) と不一致。リリース中止。"

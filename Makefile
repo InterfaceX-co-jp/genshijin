@@ -9,7 +9,8 @@ help: ## ヘルプを表示
 
 # ---------- バージョン管理 ----------
 
-VERSION := $(shell python3 -c "import json; print(json.load(open('.claude-plugin/plugin.json'))['version'])")
+PLUGIN_JSON := packages/skill-claude/.claude-plugin/plugin.json
+VERSION := $(shell python3 -c "import json; print(json.load(open('$(PLUGIN_JSON)'))['version'])")
 
 version: ## 現在のバージョンを表示
 	@echo v$(VERSION)
@@ -33,8 +34,8 @@ release-major: _check-clean-tree ## major bump + CHANGELOG 更新（1.1.0 → 2.
 	@python3 scripts/bump_version.py major
 
 release-commit: ## bump 後に commit + tag を作成（未 push）
-	@NEW_VERSION=$$(python3 -c "import json; print(json.load(open('.claude-plugin/plugin.json'))['version'])"); \
-	git add .claude-plugin/plugin.json CHANGELOG.md; \
+	@NEW_VERSION=$$(python3 -c "import json; print(json.load(open('$(PLUGIN_JSON)'))['version'])"); \
+	git add $(PLUGIN_JSON) CHANGELOG.md; \
 	git commit -m "chore(release): v$$NEW_VERSION"; \
 	git tag "v$$NEW_VERSION"; \
 	echo ""; \
@@ -43,7 +44,7 @@ release-commit: ## bump 後に commit + tag を作成（未 push）
 
 release-push: ## commit と tag を push（リリース workflow 起動）
 	@set -e; \
-	NEW_VERSION=$$(python3 -c "import json; print(json.load(open('.claude-plugin/plugin.json'))['version'])"); \
+	NEW_VERSION=$$(python3 -c "import json; print(json.load(open('$(PLUGIN_JSON)'))['version'])"); \
 	BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
 	if ! git rev-parse -q --verify "refs/tags/v$$NEW_VERSION" >/dev/null; then \
 		echo "❌ tag v$$NEW_VERSION が存在しません。先に make release-commit を実行してください。"; \
