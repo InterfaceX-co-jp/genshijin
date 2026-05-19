@@ -131,7 +131,8 @@ process.stdin.on('end', () => {
           hookEventName: "UserPromptSubmit",
           additionalContext: "原始人モード有効 (" + label + ")。" +
             "敬語・クッション・前置き・ぼかし削除。体言止め可。" +
-            "コード/コミット/PR/破壊的操作の確認時: 通常日本語。"
+            "コード/コミット/PR/破壊的操作の確認時: 通常日本語。" +
+            ".md/.txt生成依頼時: genshijin口調を自動適用しない。初回のみ「genshijin口調で書くか？」確認。No/無回答→通常日本語。確認済なら以降スキップ。"
         }
       }));
     }
