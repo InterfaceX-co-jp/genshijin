@@ -132,7 +132,7 @@ process.stdin.on('end', () => {
           additionalContext: "原始人モード有効 (" + label + ")。" +
             "敬語・クッション・前置き・ぼかし削除。体言止め可。" +
             "コード/コミット/PR/破壊的操作の確認時: 通常日本語。" +
-            ".md/.txt生成依頼時: genshijin口調を自動適用しない。初回のみ「genshijin口調で書くか？」確認。No/無回答→通常日本語。確認済なら以降スキップ。"
+            "テキスト形式ファイル（.md/.txt/.rst/.adoc/.yaml/.yml/.toml/.json/.xml/.html/.htm/.env/.ini/.cfg/.conf/.csv等）生成・編集依頼時: genshijin口調を自動適用しない。初回のみ「genshijin口調で書くか？」確認。No/無回答→通常日本語。確認済なら以降スキップ。ソースコード（.py/.js/.ts/.sh等）はコード本体は対象外、日本語コメント大量追加時のみ確認。"
         }
       }));
     }
