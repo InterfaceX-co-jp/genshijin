@@ -9,23 +9,57 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { getDefaultMode, safeWriteFlag, MODE_TO_LABEL } = require('./genshijin-config');
+const {
+  getDefaultMode,
+  safeWriteFlag,
+  readFlag,
+  recordModeChange,
+  VALID_MODES,
+  MODE_TO_LABEL,
+} = require('./genshijin-config');
 
 const claudeDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
 const flagPath = path.join(claudeDir, '.genshijin-active');
 const settingsPath = path.join(claudeDir, 'settings.json');
 
-const mode = getDefaultMode();
+// SessionStart は resume / clear / compaction 時にも再実行される。
+// 真の startup 以外では、ユーザーがセッション中に切替えたモードを保持。
+let source = 'startup';
+let sessionId = null;
+try {
+  if (!process.stdin.isTTY) {
+    const raw = fs.readFileSync(0, 'utf8');
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (data && typeof data.source === 'string') source = data.source;
+      if (data && typeof data.session_id === 'string') sessionId = data.session_id;
+    }
+  }
+} catch (e) {
+  // stdinなし/不正時は startup 扱い
+}
+
+let mode = getDefaultMode();
+if (source !== 'startup') {
+  const existing = readFlag(flagPath);
+  if (existing && VALID_MODES.includes(existing)) mode = existing;
+}
 
 // "off" モード — アクティベート一切せず、フラグ削除してルール注入なし
 if (mode === 'off') {
-  try { fs.unlinkSync(flagPath); } catch (e) {}
+  const previous = readFlag(flagPath);
+  if (safeWriteFlag(flagPath, 'off')) {
+    recordModeChange(claudeDir, null, sessionId, previous);
+  }
   process.stdout.write('OK');
   process.exit(0);
 }
 
 // 1. フラグファイル書込（symlink-safe）
-safeWriteFlag(flagPath, mode);
+const previous = readFlag(flagPath);
+if (safeWriteFlag(flagPath, mode)) {
+  recordModeChange(claudeDir, mode, sessionId, previous);
+}
 
 // 独立スキルモード（サブスキル側で挙動定義）
 const INDEPENDENT_MODES = new Set(['commit', 'review', 'compress', 'help']);

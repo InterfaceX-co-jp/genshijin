@@ -15,6 +15,12 @@ SKIP_EXTENSIONS = {
     ".dockerfile", ".makefile", ".csv", ".ini", ".cfg",
 }
 
+KNOWN_CODE_FILENAMES = {
+    "dockerfile", "makefile", "gnumakefile", "jenkinsfile", "vagrantfile",
+    "rakefile", "gemfile", "justfile", "procfile", "brewfile",
+    "cmakelists.txt",
+}
+
 CODE_PATTERNS = [
     re.compile(r"^\s*(import |from .+ import |require\(|const |let |var )"),
     re.compile(r"^\s*(def |class |function |async function |export )"),
@@ -56,6 +62,9 @@ def detect_file_type(filepath: Path) -> str:
     """ファイルを 'natural_language', 'code', 'config', 'unknown' に分類。"""
     ext = filepath.suffix.lower()
 
+    if filepath.name.lower() in KNOWN_CODE_FILENAMES:
+        return "code"
+
     if ext in COMPRESSIBLE_EXTENSIONS:
         return "natural_language"
     if ext in SKIP_EXTENSIONS:
@@ -63,11 +72,14 @@ def detect_file_type(filepath: Path) -> str:
 
     if not ext:
         try:
-            text = filepath.read_text(errors="ignore")
+            text = filepath.read_text(encoding="utf-8", errors="ignore")
         except (OSError, PermissionError):
             return "unknown"
 
         lines = text.splitlines()[:50]
+
+        if text.startswith("#!"):
+            return "code"
 
         if _is_json_content(text[:10000]):
             return "config"

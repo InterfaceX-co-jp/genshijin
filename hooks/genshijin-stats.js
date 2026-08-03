@@ -10,19 +10,48 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { readFlag, appendFlag, readHistory, safeWriteFlag } = require('./genshijin-config');
+const {
+  readFlag,
+  appendFlag,
+  readHistory,
+  safeWriteFlag,
+  VALID_MODES,
+  MODE_LOG_BASENAME,
+} = require('./genshijin-config');
 
 // benchmarks/results/*.json の平均削減率。caveman 本家は 'full' のみ計測済。
 // genshijin は 通常モード = 0.65 と仮置き（benchmarks/run.py 結果反映時に更新）。
 const COMPRESSION = { 'normal': 0.65 };
 
+const DEFAULT_RULE_OVERHEAD_TOKENS_PER_TURN = 1250;
+
+function ruleOverheadPerTurn() {
+  const raw = process.env.GENSHIJIN_RULE_OVERHEAD_TOKENS;
+  if (raw === undefined) return DEFAULT_RULE_OVERHEAD_TOKENS_PER_TURN;
+  const value = Number(raw);
+  return Number.isInteger(value) && value > 0
+    ? value
+    : DEFAULT_RULE_OVERHEAD_TOKENS_PER_TURN;
+}
+
+function deriveNet({ estSavedTokens, turns }) {
+  const overheadTokens = Math.max(0, turns || 0) * ruleOverheadPerTurn();
+  return {
+    overheadTokens,
+    netTokens: (estSavedTokens || 0) - overheadTokens,
+  };
+}
+
 // Anthropic 公開 output token 価格 USD per million。モデルID prefix で照合 →
 // claude-sonnet-4-20250514, claude-sonnet-4-7 等のポイントリリース横断対応。
 // 価格変更時は https://www.anthropic.com/pricing から更新。
 const MODEL_OUTPUT_PRICE_PER_M = [
-  ['claude-opus-4',     75.00],
+  ['claude-opus-4-0',    75.00],
+  ['claude-opus-4-1',    75.00],
+  ['claude-opus-4-2025', 75.00],
+  ['claude-opus-4',      25.00],
   ['claude-sonnet-4',   15.00],
-  ['claude-haiku-4',     4.00],
+  ['claude-haiku-4',      5.00],
   ['claude-3-5-sonnet', 15.00],
   ['claude-3-5-haiku',   4.00],
   ['claude-3-opus',     75.00],
@@ -68,12 +97,21 @@ function findRecentSession(claudeDir) {
 function parseSession(filePath) {
   let raw;
   try { raw = fs.readFileSync(filePath, 'utf8'); }
-  catch { return { outputTokens: 0, cacheReadTokens: 0, turns: 0, model: null }; }
+  catch {
+    return {
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      turns: 0,
+      model: null,
+      messages: [],
+    };
+  }
 
   let outputTokens = 0;
   let cacheReadTokens = 0;
   let turns = 0;
   let model = null;
+  const messages = [];
   for (const line of raw.split('\n')) {
     if (!line.trim()) continue;
     let entry;
@@ -85,8 +123,13 @@ function parseSession(filePath) {
     cacheReadTokens += usage.cache_read_input_tokens || 0;
     turns++;
     if (!model && entry.message.model) model = entry.message.model;
+    const ts = entry.timestamp ? Date.parse(entry.timestamp) : NaN;
+    messages.push({
+      ts: Number.isFinite(ts) ? ts : null,
+      outputTokens: usage.output_tokens || 0,
+    });
   }
-  return { outputTokens, cacheReadTokens, turns, model };
+  return { outputTokens, cacheReadTokens, turns, model, messages };
 }
 
 // genshijin-compress が残す *.original.md / *.md ペアを検出。
@@ -126,12 +169,92 @@ function summarizeCompressed(pairs) {
   return { count: pairs.length, bytesSaved, tokensSaved };
 }
 
-function deriveSavings({ outputTokens, mode, model }) {
-  const ratio = COMPRESSION[mode] != null ? COMPRESSION[mode] : null;
+function readModeLog(logPath, sessionId) {
+  const rows = [];
+  for (const line of readHistory(logPath)) {
+    let entry;
+    try { entry = JSON.parse(line); } catch { continue; }
+    if (!entry || typeof entry !== 'object' || !Number.isFinite(entry.ts)) continue;
+    if (sessionId && entry.session_id !== sessionId) continue;
+    const normalize = value => {
+      if (value == null) return null;
+      const mode = String(value);
+      return VALID_MODES.includes(mode) ? mode : undefined;
+    };
+    const mode = normalize(entry.mode);
+    const prev = normalize(entry.prev);
+    if (mode === undefined || prev === undefined) continue;
+    rows.push({ ts: entry.ts, mode, prev });
+  }
+  rows.sort((a, b) => a.ts - b.ts);
+  return rows;
+}
+
+function attributeByMode({ messages, modeLog, mode, flagMtimeMs, outputTokens }) {
+  const currentKey = mode || 'none';
+  const sessionMessages = messages || [];
+  const timestamps = sessionMessages
+    .map(message => message.ts)
+    .filter(timestamp => timestamp != null);
+  const firstTs = timestamps.length ? Math.min(...timestamps) : null;
+
+  let events = modeLog || [];
+  let basis = 'log';
+  let prefixMode;
+  if (events.length === 0) {
+    if (flagMtimeMs != null && firstTs != null && flagMtimeMs > firstTs) {
+      events = [{ ts: flagMtimeMs, mode: mode || null }];
+      basis = 'flag-mtime';
+    } else {
+      return {
+        byMode: { [currentKey]: outputTokens || 0 },
+        unknownTokens: 0,
+        basis: 'whole-session',
+      };
+    }
+  } else {
+    prefixMode = events[0].prev;
+  }
+
+  const byMode = {};
+  let unknownTokens = 0;
+  const add = (key, tokens) => {
+    byMode[key] = (byMode[key] || 0) + tokens;
+  };
+  for (const message of sessionMessages) {
+    if (message.ts == null) {
+      unknownTokens += message.outputTokens;
+      continue;
+    }
+    let active;
+    for (const event of events) {
+      if (event.ts <= message.ts) active = event;
+      else break;
+    }
+    if (active) add(active.mode || 'none', message.outputTokens);
+    else if (prefixMode !== undefined) add(prefixMode || 'none', message.outputTokens);
+    else unknownTokens += message.outputTokens;
+  }
+  return { byMode, unknownTokens, basis };
+}
+
+function wholeSessionAttribution(mode, outputTokens) {
+  return {
+    byMode: { [mode || 'none']: outputTokens || 0 },
+    unknownTokens: 0,
+    basis: 'whole-session',
+  };
+}
+
+function deriveSavings({ outputTokens, mode, model, byMode }) {
+  const attributed = byMode || { [mode || 'none']: outputTokens || 0 };
+  let estSavedTokens = 0;
+  for (const [key, tokens] of Object.entries(attributed)) {
+    const ratio = COMPRESSION[key];
+    if (ratio == null || tokens <= 0) continue;
+    estSavedTokens += Math.round(tokens / (1 - ratio)) - tokens;
+  }
   const price = priceForModel(model);
-  if (ratio === null) return { estSavedTokens: 0, estSavedUsd: 0 };
-  const estNormal = Math.round(outputTokens / (1 - ratio));
-  const estSavedTokens = estNormal - outputTokens;
   const estSavedUsd = price !== null ? (estSavedTokens / 1_000_000) * price : 0;
   return { estSavedTokens, estSavedUsd };
 }
@@ -187,26 +310,32 @@ function formatHistory({ sessions, outputTokens, estSavedTokens, estSavedUsd, si
     usdLine + sep + '\n';
 }
 
-function formatShare({ outputTokens, turns, mode, model }) {
+function formatShare({ outputTokens, turns, mode, model, attribution }) {
   if (turns === 0) {
     return '🪨 原始人モード起動済 ターン未開始 — genshijin';
   }
-  const ratio = COMPRESSION[mode] != null ? COMPRESSION[mode] : null;
-  const price = priceForModel(model);
-
-  if (ratio !== null) {
-    const estSaved = Math.round(outputTokens / (1 - ratio)) - outputTokens;
-    let usd = '';
-    if (price !== null) {
-      const amt = (estSaved / 1_000_000) * price;
-      usd = ` (~${formatUsd(amt)})`;
-    }
-    return `🪨 ${turns}ターンで output ${estSaved.toLocaleString()} tokens 削減${usd} — genshijin`;
+  const attributed = attribution || wholeSessionAttribution(mode, outputTokens);
+  const { estSavedTokens, estSavedUsd } = deriveSavings({
+    byMode: attributed.byMode,
+    model,
+  });
+  if (estSavedTokens > 0) {
+    const usd = estSavedUsd > 0 ? ` (~${formatUsd(estSavedUsd)})` : '';
+    return `🪨 ${turns}ターンで output ${estSavedTokens.toLocaleString()} tokens 削減${usd} — genshijin`;
   }
   return `🪨 ${turns}ターン, ${outputTokens.toLocaleString()} output tokens — genshijin`;
 }
 
-function formatStats({ outputTokens, cacheReadTokens, turns, mode, model, sessionPath, compressed }) {
+function formatStats({
+  outputTokens,
+  cacheReadTokens,
+  turns,
+  mode,
+  model,
+  sessionPath,
+  compressed,
+  attribution,
+}) {
   const sep = '──────────────────────────────────';
   const shortPath = sessionPath && sessionPath.length > 45
     ? '...' + sessionPath.slice(-45)
@@ -216,24 +345,62 @@ function formatStats({ outputTokens, cacheReadTokens, turns, mode, model, sessio
     return `\n原始人 Stats\n${sep}\n対話未開始 — 初回応答後に Stats 利用可能。\n${sep}\n`;
   }
 
+  const attributed = attribution || wholeSessionAttribution(mode, outputTokens);
+  const activeModes = Object.keys(attributed.byMode)
+    .filter(key => attributed.byMode[key] > 0);
+  const uniform = attributed.unknownTokens === 0 &&
+    (activeModes.length === 0 ||
+      (activeModes.length === 1 && activeModes[0] === (mode || 'none')));
   const ratio = COMPRESSION[mode] != null ? COMPRESSION[mode] : null;
   const price = priceForModel(model);
 
   let savings;
   let footer = '';
-  if (ratio !== null) {
+  if (!uniform) {
+    const { estSavedTokens, estSavedUsd } = deriveSavings({
+      byMode: attributed.byMode,
+      model,
+    });
+    const lines = [
+      attributed.basis === 'flag-mtime'
+        ? 'モードがセッション途中で設定されたため、変更後のみ集計:'
+        : 'セッション途中のモード変更を反映:',
+    ];
+    for (const key of activeModes) {
+      const tokens = attributed.byMode[key];
+      const modeRatio = COMPRESSION[key];
+      const label = key === 'none' ? '原始人off' : key;
+      const estimate = modeRatio == null
+        ? '推定対象外'
+        : `推定${(Math.round(tokens / (1 - modeRatio)) - tokens).toLocaleString()}削減`;
+      lines.push(`  ${label}: ${tokens.toLocaleString()} tokens (${estimate})`);
+    }
+    if (attributed.unknownTokens > 0) {
+      lines.push(`  モード不明: ${attributed.unknownTokens.toLocaleString()} tokens (推定除外)`);
+    }
+    lines.push(`推定output削減:          ${estSavedTokens.toLocaleString()}`);
+    if (estSavedUsd > 0) lines.push(`推定削減USD:             ~${formatUsd(estSavedUsd)}`);
+    savings = lines.join('\n');
+    footer = 'モード判定可能な区間のみ推定。削減率はoutput tokenのみ。入力/cache使用量は未削減。';
+  } else if (ratio !== null) {
     const estNormal = Math.round(outputTokens / (1 - ratio));
     const estSaved = estNormal - outputTokens;
+    const { overheadTokens, netTokens } = deriveNet({
+      estSavedTokens: estSaved,
+      turns,
+    });
     let usdLine = '';
     if (price !== null) {
       const usd = (estSaved / 1_000_000) * price;
       usdLine = `推定削減USD:           ~${formatUsd(usd)}\n`;
-      footer = `推定値 = benchmarks/ 平均値由来。価格 = ${model}。実数はタスク依存。`;
+      footer = `推定値 = benchmarks/ 平均値由来。価格 = ${model}。削減率はoutput tokenのみ。入力/cache使用量は未削減。`;
     } else {
-      footer = '推定値 = benchmarks/ 平均値由来。実数はタスク依存。';
+      footer = '推定値 = benchmarks/ 平均値由来。削減率はoutput tokenのみ。入力/cache使用量は未削減。';
     }
     savings = `推定 原始人未使用時:   ${estNormal.toLocaleString()}\n` +
-              `推定削減トークン:       ${estSaved.toLocaleString()} (~${Math.round(ratio * 100)}%)\n` +
+              `推定output削減:          ${estSaved.toLocaleString()} (~${Math.round(ratio * 100)}%)\n` +
+              `推定ルール入力コスト:     ${overheadTokens.toLocaleString()} (~${ruleOverheadPerTurn().toLocaleString()}/turn)\n` +
+              `推定net:                 ${netTokens >= 0 ? '+' : ''}${netTokens.toLocaleString()}\n` +
               usdLine.replace(/\n$/, '');
   } else if (mode && mode !== 'off') {
     savings = `'${mode}' モード未ベンチマーク — 'normal' のみ計測済。`;
@@ -289,11 +456,25 @@ function main() {
   }
 
   const parsed = parseSession(sessionFile);
-  const mode = readFlag(path.join(claudeDir, '.genshijin-active'));
+  const sessionId = path.basename(sessionFile, '.jsonl');
+  const flagPath = path.join(claudeDir, '.genshijin-active');
+  const flagMode = readFlag(flagPath);
+  const mode = flagMode === 'off' ? null : flagMode;
+  let flagMtimeMs = null;
+  try { flagMtimeMs = fs.statSync(flagPath).mtimeMs; } catch (e) {}
+  const attribution = attributeByMode({
+    messages: parsed.messages,
+    modeLog: readModeLog(path.join(claudeDir, MODE_LOG_BASENAME), sessionId),
+    mode,
+    flagMtimeMs,
+    outputTokens: parsed.outputTokens,
+  });
 
   if (parsed.turns > 0) {
-    const { estSavedTokens, estSavedUsd } = deriveSavings({ ...parsed, mode });
-    const sessionId = path.basename(sessionFile, '.jsonl');
+    const { estSavedTokens, estSavedUsd } = deriveSavings({
+      byMode: attribution.byMode,
+      model: parsed.model,
+    });
     appendFlag(historyPath, JSON.stringify({
       ts: Date.now(),
       session_id: sessionId,
@@ -311,11 +492,17 @@ function main() {
   }
 
   if (share) {
-    process.stdout.write(formatShare({ ...parsed, mode }) + '\n');
+    process.stdout.write(formatShare({ ...parsed, mode, attribution }) + '\n');
   } else {
     const scanDirs = [claudeDir, process.cwd()].filter((d, i, a) => a.indexOf(d) === i);
     const compressed = summarizeCompressed(findCompressedPairs(scanDirs));
-    process.stdout.write(formatStats({ ...parsed, mode, sessionPath: sessionFile, compressed }));
+    process.stdout.write(formatStats({
+      ...parsed,
+      mode,
+      sessionPath: sessionFile,
+      compressed,
+      attribution,
+    }));
   }
 }
 
@@ -323,6 +510,8 @@ if (require.main === module) main();
 
 module.exports = {
   formatStats, formatShare, formatHistory, aggregateHistory, parseDuration, deriveSavings,
+  deriveNet, ruleOverheadPerTurn,
   parseSession, priceForModel, formatUsd, COMPRESSION, MODEL_OUTPUT_PRICE_PER_M,
   findCompressedPairs, summarizeCompressed, humanizeTokens,
+  readModeLog, attributeByMode,
 };

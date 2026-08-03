@@ -1,3 +1,6 @@
+$Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+[Console]::OutputEncoding = $Utf8NoBom
+
 $ClaudeDir = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $HOME ".claude" }
 $Flag = Join-Path $ClaudeDir ".genshijin-active"
 if (-not (Test-Path $Flag)) { exit 0 }
@@ -27,6 +30,7 @@ $Mode = ($Mode -replace '[^a-z0-9-]', '')
 
 $Valid = @('off','polite','normal','extreme','commit','review','compress','help')
 if (-not ($Valid -contains $Mode)) { exit 0 }
+if ($Mode -eq 'off') { exit 0 }
 
 # ASCII モード → 日本語ラベル
 $Label = switch ($Mode) {

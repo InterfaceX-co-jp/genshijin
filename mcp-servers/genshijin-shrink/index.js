@@ -25,7 +25,7 @@
 //   GENSHIJIN_SHRINK_FIELDS  圧縮対象 field 名 comma-separated (default: description)
 //   GENSHIJIN_SHRINK_DEBUG=1  圧縮 delta を stderr に log
 
-const { spawn } = require('child_process');
+const spawn = require('cross-spawn');
 const { compressDescriptionsInPlace, compress } = require('./compress');
 
 const args = process.argv.slice(2);
@@ -41,6 +41,7 @@ const fields = (process.env.GENSHIJIN_SHRINK_FIELDS || 'description')
 
 const upstream = spawn(args[0], args.slice(1), {
   stdio: ['pipe', 'pipe', 'inherit'],
+  windowsHide: true,
 });
 
 upstream.on('error', err => {

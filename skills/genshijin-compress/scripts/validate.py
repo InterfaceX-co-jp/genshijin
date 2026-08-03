@@ -2,6 +2,7 @@
 """圧縮後ファイルの検証: 見出し・コードブロック・URL・パス・箇条書き保持確認。"""
 
 import re
+from collections import Counter
 from pathlib import Path
 
 URL_REGEX = re.compile(r"https?://[^\s)]+")
@@ -27,7 +28,7 @@ class ValidationResult:
 
 
 def read_file(path: Path) -> str:
-    return path.read_text(errors="ignore")
+    return path.read_text(encoding="utf-8")
 
 
 def extract_headings(text):
@@ -86,6 +87,14 @@ def count_bullets(text):
     return len(BULLET_REGEX.findall(text))
 
 
+def extract_inline_codes(text):
+    """fenced code block を除外し、inline code を抽出。"""
+    text_without_fences = text
+    for block in extract_code_blocks(text):
+        text_without_fences = text_without_fences.replace(block, "", 1)
+    return re.findall(r"`([^`]+)`", text_without_fences)
+
+
 def validate_headings(orig, comp, result):
     h1 = extract_headings(orig)
     h2 = extract_headings(comp)
@@ -134,6 +143,23 @@ def validate_bullets(orig, comp, result):
         result.add_warning(f"箇条書き数 変化過大: {b1} -> {b2}")
 
 
+def validate_inline_codes(orig, comp, result):
+    c1 = Counter(extract_inline_codes(orig))
+    c2 = Counter(extract_inline_codes(comp))
+    if c1 == c2:
+        return
+
+    lost = set(c1) - set(c2)
+    added = set(c2) - set(c1)
+    for code, count in c1.items():
+        if code in c2 and c2[code] < count:
+            lost.add(f"{code}（{count}回中{count - c2[code]}回消失）")
+    if lost:
+        result.add_error(f"インラインコード消失: {lost}")
+    if added:
+        result.add_warning(f"インラインコード追加: {added}")
+
+
 def validate(original_path: Path, compressed_path: Path) -> ValidationResult:
     result = ValidationResult()
 
@@ -145,6 +171,7 @@ def validate(original_path: Path, compressed_path: Path) -> ValidationResult:
     validate_urls(orig, comp, result)
     validate_paths(orig, comp, result)
     validate_bullets(orig, comp, result)
+    validate_inline_codes(orig, comp, result)
 
     return result
 

@@ -81,20 +81,69 @@ function safeWriteFlag(flagPath, content) {
       if (e.code !== 'ENOENT') return;
     }
 
-    const tempPath = path.join(flagDir, `.genshijin-active.${process.pid}.${Date.now()}`);
-    const O_NOFOLLOW = typeof fs.constants.O_NOFOLLOW === 'number' ? fs.constants.O_NOFOLLOW : 0;
-    const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | O_NOFOLLOW;
-    let fd;
+    let tempPath;
     try {
-      fd = fs.openSync(tempPath, flags, 0o600);
-      fs.writeSync(fd, String(content));
-      try { fs.fchmodSync(fd, 0o600); } catch (e) { /* Windows ベストエフォート */ }
+      tempPath = path.join(
+        flagDir,
+        `.genshijin-active.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}`
+      );
+      const O_NOFOLLOW = typeof fs.constants.O_NOFOLLOW === 'number' ? fs.constants.O_NOFOLLOW : 0;
+      const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | O_NOFOLLOW;
+      let fd;
+      try {
+        fd = fs.openSync(tempPath, flags, 0o600);
+        fs.writeSync(fd, String(content));
+        try { fs.fchmodSync(fd, 0o600); } catch (e) { /* Windows ベストエフォート */ }
+      } finally {
+        if (fd !== undefined) fs.closeSync(fd);
+      }
+
+      let renamed = false;
+      let windowsPrevious = null;
+      let windowsRemovedOriginal = false;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          fs.renameSync(tempPath, flagPath);
+          renamed = true;
+          break;
+        } catch (e) {
+          const transient = ['EPERM', 'EBUSY', 'EACCES', 'EEXIST'].includes(e.code);
+          if (!transient) throw e;
+          if (process.platform === 'win32') {
+            // 初回削除後に宛先が再出現した場合は別writerの成功。上書きしない。
+            if (windowsRemovedOriginal) break;
+            // Windows rename は既存宛先を置換不可。削除後renameなら部分書込を避けられる。
+            try {
+              const current = fs.lstatSync(flagPath);
+              if (current.isSymbolicLink() || !current.isFile()) return;
+              if (windowsPrevious === null) {
+                windowsPrevious = fs.readFileSync(flagPath);
+              }
+              fs.unlinkSync(flagPath);
+              windowsRemovedOriginal = true;
+            } catch (unlinkError) {
+              if (unlinkError.code !== 'ENOENT') continue;
+            }
+          }
+        }
+      }
+      if (!renamed) {
+        if (windowsPrevious !== null) {
+          try {
+            fs.writeFileSync(flagPath, windowsPrevious, { flag: 'wx', mode: 0o600 });
+          } catch (e) { /* 別writer成功済み or 復元不能 */ }
+        }
+        return;
+      }
+      return true;
     } finally {
-      if (fd !== undefined) fs.closeSync(fd);
+      if (tempPath) {
+        try { fs.unlinkSync(tempPath); } catch (e) { /* rename済み or 未作成 */ }
+      }
     }
-    fs.renameSync(tempPath, flagPath);
   } catch (e) {
     // silent fail — フラグはベストエフォート
+    return false;
   }
 }
 
@@ -162,6 +211,27 @@ function appendFlag(flagPath, line) {
   }
 }
 
+const MODE_LOG_BASENAME = '.genshijin-mode-log.jsonl';
+
+function recordModeChange(claudeDir, newMode, sessionId, previousMode) {
+  try {
+    const rawCurrent = arguments.length >= 4
+      ? previousMode
+      : readFlag(path.join(claudeDir, '.genshijin-active'));
+    const current = rawCurrent === 'off' ? null : rawCurrent;
+    const next = newMode || null;
+    if (!sessionId && (current || null) === next) return;
+    const entry = { ts: Date.now(), mode: next, prev: current || null };
+    if (sessionId) entry.session_id = sessionId;
+    appendFlag(
+      path.join(claudeDir, MODE_LOG_BASENAME),
+      JSON.stringify(entry)
+    );
+  } catch (e) {
+    // best effort
+  }
+}
+
 // 履歴ログ読込。symlink拒否、最大10MBで打切。
 const MAX_HISTORY_BYTES = 10 * 1024 * 1024;
 
@@ -203,5 +273,7 @@ module.exports = {
   safeWriteFlag,
   readFlag,
   appendFlag,
-  readHistory
+  readHistory,
+  recordModeChange,
+  MODE_LOG_BASENAME
 };

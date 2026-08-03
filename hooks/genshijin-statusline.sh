@@ -21,6 +21,7 @@ case "$MODE" in
   off|polite|normal|extreme|commit|review|compress|help) ;;
   *) exit 0 ;;
 esac
+[ "$MODE" = "off" ] && exit 0
 
 # ASCII モード → 日本語ラベル
 case "$MODE" in

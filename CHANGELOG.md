@@ -4,6 +4,33 @@
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-08-04
+
+インストーラとアンインストーラを共通 Node.js CLI に統合し、JSONC 設定の安全な更新と対称的な削除を実装。フック、stats、圧縮処理、MCP middleware の信頼性も改善。
+
+### Added
+
+- **共通 Node.js installer/uninstaller** — Bash・PowerShell の全入口を同一実装へ統合
+- **JSONC 設定操作** — コメント・末尾カンマ対応、バックアップ、atomic write、解析失敗時の無変更保証
+- **Claude Code 用 Markdown スラッシュコマンド** — help・compress を含む6コマンド
+- installer、フック、圧縮、MCP middleware の回帰テスト
+
+### Changed
+
+- standalone hooks の install/uninstall を共通 CLI shim 化
+- PowerShell installer/uninstaller に `DryRun` と `ConfigDir` を追加
+- MCP middleware の Windows 引数処理を `cross-spawn` ベースへ変更
+- stats のモデル価格、ルールオーバーヘッド、メッセージ単位モード帰属を更新
+- 圧縮時の保護セグメント復元と検証処理を強化
+
+### Fixed
+
+- SessionStart resume 時に明示的な off 状態と有効モードを保持
+- 並行セッションのモード遷移が stats 集計へ混入する問題
+- フラグファイル更新時に一時ファイルが残る問題
+- slash command envelope のモード検出漏れ
+- uninstall 時に managed hooks・statusLine・状態ファイルが残る非対称性
+
 ## [1.4.0] - 2026-05-07
 
 caveman 本家 v1.3.0以降 (`56875e8` / `83ec61c` / `e031c1e`) との差分を全項目移植。stats receipts / smart installer / cavecrew相当 / cavepack相当 / MCP-shrink。

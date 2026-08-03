@@ -1,6 +1,6 @@
 {
   "name": "genshijin-shrink",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP proxy that compresses prose fields (tool descriptions, etc.) using genshijin rules. Same accuracy, fewer context tokens. Japanese + English.",
   "license": "MIT",
   "homepage": "https://github.com/InterfaceX-co-jp/genshijin",
@@ -28,5 +28,8 @@
     "index.js",
     "compress.js",
     "README.md"
-  ]
+  ],
+  "dependencies": {
+    "cross-spawn": "^7.0.6"
+  }
 }

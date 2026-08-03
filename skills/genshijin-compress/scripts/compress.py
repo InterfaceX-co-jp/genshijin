@@ -9,8 +9,11 @@ genshijin メモリ圧縮オーケストレータ
 import io
 import os
 import re
+import shutil
+import stat
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import List
 
@@ -27,8 +30,10 @@ OUTER_FENCE_REGEX = re.compile(
     r"\A\s*(`{3,}|~{3,})[^\n]*\n(.*)\n\1\s*\Z", re.DOTALL
 )
 
-# Frontmatter (YAML) 検出 — 圧縮後ファイル先頭余白除去用
-FRONTMATTER_REGEX = re.compile(r"\A(---\s*\n.*?\n---\s*\n)", re.DOTALL)
+# YAML frontmatter。圧縮対象から外し、byte-equivalent な文字列として復元。
+FRONTMATTER_REGEX = re.compile(
+    r"\A(---\r?\n.*?\r?\n---\r?\n)(.*)", re.DOTALL
+)
 
 # 機密・PII を含む可能性高いファイル名/パス。圧縮すると Anthropic API に生データ送信 →
 # 機密リポジトリでは越えられない第三者データ境界。detect.py は .env を拡張子で弾くが、
@@ -77,6 +82,18 @@ def strip_llm_wrapper(text: str) -> str:
     return text
 
 
+def split_frontmatter(text: str):
+    """UTF-8 BOM/YAML frontmatter と本文を分離。prefix は無変更で復元。"""
+    bom = "\ufeff" if text.startswith("\ufeff") else ""
+    source = text[len(bom):]
+    m = FRONTMATTER_REGEX.match(source)
+    if m:
+        return bom + m.group(1), m.group(2)
+    if bom:
+        return bom, source
+    return "", source
+
+
 def cleanup_compressed(text: str) -> str:
     """圧縮後テキストの最終整形:
     - frontmatter 後の連続空行を1行に
@@ -85,15 +102,53 @@ def cleanup_compressed(text: str) -> str:
     """
     if text.startswith("﻿"):
         text = text[1:]
-    # frontmatter 後の余白整形
-    m = FRONTMATTER_REGEX.match(text)
-    if m:
-        head = m.group(1)
-        rest = text[len(head):].lstrip("\n")
-        text = head + "\n" + rest
     # 末尾改行 1個に
     text = text.rstrip() + "\n"
     return text
+
+
+def write_text_atomic(path: Path, text: str) -> None:
+    """UTF-8へ先にencodeし、同一ディレクトリの一時ファイルからatomic置換。"""
+    data = text.encode("utf-8")
+    fd, tmp_name = tempfile.mkstemp(
+        dir=str(path.parent), prefix=path.name + ".", suffix=".tmp"
+    )
+    tmp_path = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+            f.flush()
+            os.fsync(f.fileno())
+        if path.exists():
+            os.chmod(tmp_path, stat.S_IMODE(path.stat().st_mode))
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            tmp_path.unlink()
+        except OSError:
+            pass
+        raise
+
+
+def read_text_exact(path: Path, errors: str = "strict") -> str:
+    """UTF-8読込。改行変換を無効化し、CRLF/LFをそのまま保持。"""
+    with path.open("r", encoding="utf-8", errors=errors, newline="") as file:
+        return file.read()
+
+
+def first_nonblank_line(text: str) -> str:
+    for line in text.splitlines():
+        if line.strip():
+            return line.strip()
+    return ""
+
+
+def _write_target(filepath: Path, text: str, backup_path: Path) -> None:
+    try:
+        write_text_atomic(filepath, text)
+    except Exception:
+        print(f"❌ {filepath} への書込失敗。原文バックアップ: {backup_path}")
+        raise
 
 
 from .detect import should_compress
@@ -118,13 +173,16 @@ def call_claude(prompt: str) -> str:
         except ImportError:
             pass  # anthropic未インストール → CLI fallback
     # Fallback: claude CLI 使用（デスクトップ認証対応）
+    claude_bin = shutil.which("claude") or "claude"
     try:
         result = subprocess.run(
-            ["claude", "--print"],
+            [claude_bin, "--print"],
             input=prompt,
             text=True,
             capture_output=True,
             check=True,
+            encoding="utf-8",
+            errors="replace",
         )
         return strip_llm_wrapper(result.stdout.strip())
     except subprocess.CalledProcessError as e:
@@ -216,7 +274,7 @@ def compress_file(filepath: Path) -> bool:
         print("スキップ（自然言語ではない）")
         return False
 
-    original_text = filepath.read_text(encoding="utf-8", errors="replace")
+    original_text = read_text_exact(filepath)
 
     # 空ファイル ガード — Claude API 送信不要、原ファイル無変更
     if not original_text.strip():
@@ -232,18 +290,39 @@ def compress_file(filepath: Path) -> bool:
         print("データ損失防止のため中止。続行するには既存バックアップを削除 or リネームしてください。")
         return False
 
-    # Step 1: 圧縮
+    # frontmatter は LLM に渡さず、そのまま復元
+    frontmatter, body = split_frontmatter(original_text)
+    if frontmatter:
+        label = "YAML frontmatter" if frontmatter.lstrip("\ufeff").startswith("---") else "UTF-8 BOM"
+        print(f"{label} 検出（{len(frontmatter)}文字）— 無変更で保持")
+    if not body.strip():
+        print("スキップ: frontmatter 除去後の本文が空")
+        return False
+
+    # Step 1: 本文のみ圧縮
     print("Claude で圧縮中...")
-    compressed = cleanup_compressed(call_claude(build_compress_prompt(original_text)))
+    compressed_body = call_claude(build_compress_prompt(body))
+
+    if compressed_body is None or not compressed_body.strip():
+        print("スキップ: Claude が空出力を返したため原ファイル無変更")
+        return False
+
+    compressed_body = cleanup_compressed(compressed_body)
 
     # 同一出力 ガード — Claude が圧縮失敗 or 既に圧縮済の場合バックアップ作らず終了
-    if compressed.strip() == original_text.strip():
+    if compressed_body.strip() == body.strip():
         print("スキップ: 圧縮効果なし（既に最小形 or LLM未削減）")
         return False
 
+    compressed = frontmatter + compressed_body
+
     # 原ファイルをバックアップ、圧縮版を原パスに書き込み
-    backup_path.write_text(original_text, encoding="utf-8")
-    filepath.write_text(compressed, encoding="utf-8")
+    write_text_atomic(backup_path, original_text)
+    if read_text_exact(backup_path) != original_text:
+        backup_path.unlink(missing_ok=True)
+        print("❌ バックアップ検証失敗。原ファイル無変更")
+        return False
+    _write_target(filepath, compressed, backup_path)
 
     # Step 2: 検証 + リトライ
     for attempt in range(MAX_RETRIES):
@@ -261,15 +340,25 @@ def compress_file(filepath: Path) -> bool:
 
         if attempt == MAX_RETRIES - 1:
             # 失敗時は原ファイル復元
-            filepath.write_text(original_text, encoding="utf-8")
+            _write_target(filepath, original_text, backup_path)
             backup_path.unlink(missing_ok=True)
             print("❌ リトライ後も失敗 — 原ファイル復元")
             return False
 
         print("Claude でピンポイント修正中...")
-        compressed = cleanup_compressed(call_claude(
-            build_fix_prompt(original_text, compressed, result.errors)
-        ))
-        filepath.write_text(compressed, encoding="utf-8")
+        current_body = compressed[len(frontmatter):] if frontmatter else compressed
+        fixed_body = call_claude(
+            build_fix_prompt(body, current_body, result.errors)
+        )
+        if fixed_body is None or not fixed_body.strip():
+            print("❌ 修正出力が空。今回の修正をスキップ")
+            continue
+        fixed_body = cleanup_compressed(fixed_body)
+        anchor = first_nonblank_line(body)
+        if anchor.startswith("#") and first_nonblank_line(fixed_body) != anchor:
+            print("❌ 修正出力の先頭構造が原文と不一致。前置き混入の可能性によりスキップ")
+            continue
+        compressed = frontmatter + fixed_body
+        _write_target(filepath, compressed, backup_path)
 
     return True
