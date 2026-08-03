@@ -10,7 +10,7 @@ genshijin ベンチマーク
 使い方:
   pip install -r requirements.txt
   export ANTHROPIC_API_KEY=sk-ant-...
-  python run.py [--trials 3] [--model claude-sonnet-4-20250514] [--update-readme]
+  python run.py [--trials 3] [--model claude-sonnet-4-6] [--update-readme]
 """
 
 import argparse
@@ -272,8 +272,8 @@ def main():
     parser.add_argument("--trials", type=int, default=3, help="試行回数 (デフォルト: 3)")
     parser.add_argument(
         "--model",
-        default="claude-sonnet-4-20250514",
-        help="使用モデル (デフォルト: claude-sonnet-4-20250514)",
+        default="claude-sonnet-4-6",
+        help="使用モデル (デフォルト: claude-sonnet-4-6)",
     )
     parser.add_argument(
         "--update-readme",
