@@ -24,7 +24,7 @@ jobs:
         lang: ${{ fromJSON(inputs.lang == 'both' && '["ja","en"]' || format('["{0}"]', inputs.lang)) }}
     steps:
       - name: Checkout main
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: main
           fetch-depth: 0
