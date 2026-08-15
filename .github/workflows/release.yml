@@ -130,7 +130,7 @@ jobs:
           git push origin main
 
       - name: Upload benchmark artifact (再実行保険)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: benchmark-${{ steps.version.outputs.tag }}
           path: benchmarks/results/${{ steps.version.outputs.tag }}_ja.json
@@ -162,7 +162,7 @@ jobs:
 
       - name: Download benchmark artifact (フォールバック)
         if: steps.release-check.outputs.exists != 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         continue-on-error: true
         with:
           name: benchmark-${{ needs.benchmark.outputs.tag }}
